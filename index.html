@@ -473,7 +473,7 @@
     async function handleSlipFile(file) {
       if (!file.type.startsWith('image/')) { toast('กรุณาเลือกไฟล์รูปภาพเท่านั้น', 'error'); return; }
       try {
-        const compressed = await compressImage(file);
+        const compressed = await compressImage(file, 1024, 0.6);
         currentSlip = compressed;
         document.getElementById('dropzone-empty').classList.add('hidden');
         const img = document.getElementById('slip-preview');
