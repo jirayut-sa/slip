@@ -502,18 +502,22 @@
       const na = normalizeThaiName(a);
       const nb = normalizeThaiName(b);
       if (!na || !nb) return 0;
-      if (na === nb) return 1;
+      if (na === nb) return 1; // ตรงเป๊ะทุกตัวอักษร
+      
       const tokensA = na.split(' ').filter(Boolean);
       const tokensB = nb.split(' ').filter(Boolean);
       if (!tokensA.length || !tokensB.length) return 0;
-      let matchCount = 0;
-      tokensA.forEach(ta => {
-        if (tokensB.some(tb => tb === ta || (ta.length >= 2 && tb.length >= 2 && (tb.startsWith(ta) || ta.startsWith(tb))))) matchCount++;
-      });
-      const ratio = matchCount / Math.max(tokensA.length, tokensB.length);
-      if (ratio > 0) return ratio;
-      if (na.includes(nb) || nb.includes(na)) return 0.6;
-      return 0;
+      
+      // ดึงแค่คำแรก (ชื่อจริง) มาเทียบกัน
+      const firstNameA = tokensA[0];
+      const firstNameB = tokensB[0];
+      
+      // ถ้าชื่อจริงตรงกัน ให้คะแนน 0.8 (ถือว่าตรงกันบางส่วน เพื่อสั่งให้โชว์กล่องติ๊กยืนยัน)
+      if (firstNameA === firstNameB || firstNameA.includes(firstNameB) || firstNameB.includes(firstNameA)) {
+        return 0.8; 
+      }
+      
+      return 0; // ไม่ตรงเลย
     }
 
     // ตรวจสอบชื่อผู้โอน (จาก OCR) กับสมาชิกที่เลือก แล้วอัปเดต banner/checkbox ใน UI
@@ -531,7 +535,7 @@
 
       if (!memberName) {
         overrideCheckbox.checked = false;
-        return true; // ยังไม่ได้เลือกสมาชิก ปล่อยให้ validation อื่นจัดการ
+        return true; 
       }
 
       if (!senderName) {
@@ -548,18 +552,24 @@
       banner.classList.add('flex');
 
       if (sim >= 0.99) {
+        // ชื่อตรงเป๊ะ 100%
         banner.classList.add('bg-emerald-50', 'border', 'border-emerald-200', 'text-emerald-700');
         text.textContent = 'ชื่อผู้โอนในสลิปตรงกับสมาชิก "' + memberName + '" ✓ ดึงข้อมูลครบแล้ว พร้อมบันทึก';
         overrideWrap.classList.add('hidden');
         overrideCheckbox.checked = false;
         return true;
       } else if (sim >= 0.5) {
+        // ชื่อตรงแค่บางส่วน (เราดักไว้แค่ชื่อจริง) -> สีเหลือง
         banner.classList.add('bg-amber-50', 'border', 'border-amber-200', 'text-amber-800');
-        text.textContent = 'ชื่อผู้โอน "' + senderName + '" ใกล้เคียงกับ "' + memberName + '" แต่ไม่ตรงทั้งหมด กรุณาตรวจสอบก่อนยืนยัน';
+        text.textContent = 'ชื่อผู้โอน "' + senderName + '" ตรงกันเฉพาะชื่อ ระบบได้ทำการติ๊กยืนยันให้อัตโนมัติแล้ว ✓';
         overrideWrap.classList.remove('hidden');
         overrideWrap.classList.add('flex');
-        return overrideCheckbox.checked;
+        
+        // 🌟 บังคับติ๊กถูกให้อัตโนมัติ และอนุญาตให้ปุ่ม "บันทึก" ทำงานได้เลย
+        overrideCheckbox.checked = true;
+        return true; 
       } else {
+        // ชื่อไม่ตรงกันเลย -> สีแดง
         banner.classList.add('bg-red-50', 'border', 'border-red-200', 'text-red-700');
         text.textContent = 'ชื่อผู้โอน "' + senderName + '" ไม่ตรงกับสมาชิกที่เลือก "' + memberName + '" กรุณาตรวจสอบให้แน่ใจ';
         overrideWrap.classList.remove('hidden');
