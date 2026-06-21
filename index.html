@@ -174,7 +174,17 @@
 
           <!-- OCR result -->
           <div id="ocr-result" class="hidden pop-in bg-teal-50 border border-teal-200 rounded-xl p-4 space-y-3">
-            <p class="text-xs font-bold text-teal-700 flex items-center gap-1.5"><i data-lucide="scan-line" class="w-4 h-4"></i> ข้อมูลที่อ่านได้จากสลิป (ตรวจสอบก่อนยืนยัน)</p>
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <p class="text-xs font-bold text-teal-700 flex items-center gap-1.5"><i data-lucide="scan-line" class="w-4 h-4"></i> ข้อมูลที่อ่านได้จากสลิป (ตรวจสอบก่อนยืนยัน)</p>
+              <span id="bank-detected-badge" class="hidden text-[11px] font-semibold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full whitespace-nowrap"></span>
+            </div>
+
+            <!-- สถานะตรวจสอบชื่อผู้โอนเทียบกับสมาชิกที่เลือก -->
+            <div id="name-match-banner" class="hidden rounded-lg p-3 text-xs font-medium items-start gap-2">
+              <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5"></i>
+              <span id="name-match-text"></span>
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 ocr-field">
               <div>
                 <label class="block text-xs text-gray-500 mb-1">จำนวนเงิน (บาท)</label>
@@ -189,6 +199,13 @@
               <label class="block text-xs text-gray-500 mb-1">ชื่อผู้โอน (จากสลิป — เพื่อใช้อ้างอิง/ตรวจสอบเท่านั้น)</label>
               <input id="ocr-sender" type="text" class="w-full border border-teal-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500" placeholder="ไม่พบข้อมูล">
             </div>
+
+            <!-- แสดงเมื่อชื่อไม่ตรง: ต้องติ๊กยืนยันก่อนจึงจะบันทึกได้ -->
+            <label id="name-mismatch-override-wrap" class="hidden items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 cursor-pointer">
+              <input id="name-mismatch-override" type="checkbox" class="mt-0.5">
+              <span>ชื่อผู้โอนในสลิปไม่ตรงกับสมาชิกที่เลือก แต่ฉันตรวจสอบแล้วว่าข้อมูลถูกต้อง ต้องการบันทึกรายการนี้ต่อ</span>
+            </label>
+
             <p class="text-[11px] text-teal-700/70 leading-relaxed">* ระบบอ่านข้อมูลด้วย OCR อัตโนมัติ อาจคลาดเคลื่อนได้ กรุณาตรวจสอบและแก้ไขให้ถูกต้องก่อนกดยืนยัน</p>
           </div>
 
@@ -267,6 +284,7 @@
     let state = { members: [], transactions: [] };
     let adminUnlocked = false;
     let currentSlip = null; // { base64, mimeType }
+    let currentOcrExtra = {}; // { senderBank, receiverName, receiverBank, referenceNo, bankApp }
 
     // ---------------- Utilities ----------------
     function toast(message, type = 'success') {
@@ -443,6 +461,15 @@
       if (file) handleSlipFile(file);
     });
 
+    // เปลี่ยนสมาชิกที่เลือก / แก้ไขชื่อผู้โอนเอง / ติ๊กยืนยันกรณีชื่อไม่ตรง → ตรวจสอบชื่อใหม่ทุกครั้ง
+    document.getElementById('select-member').addEventListener('change', () => {
+      if (!document.getElementById('ocr-result').classList.contains('hidden')) checkNameMatch();
+    });
+    document.getElementById('ocr-sender').addEventListener('input', () => {
+      if (!document.getElementById('ocr-result').classList.contains('hidden')) checkNameMatch();
+    });
+    document.getElementById('name-mismatch-override').addEventListener('change', checkNameMatch);
+
     async function handleSlipFile(file) {
       if (!file.type.startsWith('image/')) { toast('กรุณาเลือกไฟล์รูปภาพเท่านั้น', 'error'); return; }
       try {
@@ -459,10 +486,94 @@
       }
     }
 
+    // ---------------- Name matching (สลิป vs สมาชิกที่เลือก) ----------------
+    function normalizeThaiName(name) {
+      if (!name) return '';
+      let s = String(name).trim();
+      // ตัดคำนำหน้าชื่อทั้งไทย/อังกฤษออกก่อนเทียบ
+      s = s.replace(/^(นาย|นาง|นางสาว|น\.ส\.|ด\.ช\.|ด\.ญ\.|คุณ|Mr\.?|Mrs\.?|Ms\.?|Miss)\s*/i, '');
+      s = s.replace(/\s+/g, ' ').trim();
+      return s.toLowerCase();
+    }
+
+    // คืนค่าความใกล้เคียง 0-1 ระหว่างชื่อสองชื่อ โดยเทียบทีละคำ (รองรับนามสกุลเดียวกันแต่สลับลำดับ,
+    // ชื่อที่ถูกตัด/มาสก์บางส่วน เช่น "สมชาย ใ*****" และคำนำหน้าที่ต่างกัน)
+    function nameSimilarity(a, b) {
+      const na = normalizeThaiName(a);
+      const nb = normalizeThaiName(b);
+      if (!na || !nb) return 0;
+      if (na === nb) return 1;
+      const tokensA = na.split(' ').filter(Boolean);
+      const tokensB = nb.split(' ').filter(Boolean);
+      if (!tokensA.length || !tokensB.length) return 0;
+      let matchCount = 0;
+      tokensA.forEach(ta => {
+        if (tokensB.some(tb => tb === ta || (ta.length >= 2 && tb.length >= 2 && (tb.startsWith(ta) || ta.startsWith(tb))))) matchCount++;
+      });
+      const ratio = matchCount / Math.max(tokensA.length, tokensB.length);
+      if (ratio > 0) return ratio;
+      if (na.includes(nb) || nb.includes(na)) return 0.6;
+      return 0;
+    }
+
+    // ตรวจสอบชื่อผู้โอน (จาก OCR) กับสมาชิกที่เลือก แล้วอัปเดต banner/checkbox ใน UI
+    // คืนค่า true หากบันทึกได้ (ชื่อตรง หรือผู้ใช้ติ๊กยืนยันแล้ว), false หากยังบันทึกไม่ได้
+    function checkNameMatch() {
+      const memberName = document.getElementById('select-member').value;
+      const senderName = document.getElementById('ocr-sender').value;
+      const banner = document.getElementById('name-match-banner');
+      const text = document.getElementById('name-match-text');
+      const overrideWrap = document.getElementById('name-mismatch-override-wrap');
+      const overrideCheckbox = document.getElementById('name-mismatch-override');
+
+      banner.className = 'rounded-lg p-3 text-xs font-medium items-start gap-2 hidden';
+      overrideWrap.className = 'hidden items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 cursor-pointer';
+
+      if (!memberName) {
+        overrideCheckbox.checked = false;
+        return true; // ยังไม่ได้เลือกสมาชิก ปล่อยให้ validation อื่นจัดการ
+      }
+
+      if (!senderName) {
+        banner.classList.remove('hidden');
+        banner.classList.add('flex', 'bg-gray-50', 'border', 'border-gray-200', 'text-gray-500');
+        text.textContent = 'ไม่พบชื่อผู้โอนจากสลิป กรุณาตรวจสอบยอดเงิน/ผู้โอนด้วยตนเองก่อนยืนยัน';
+        overrideWrap.classList.remove('hidden');
+        overrideWrap.classList.add('flex');
+        return overrideCheckbox.checked;
+      }
+
+      const sim = nameSimilarity(senderName, memberName);
+      banner.classList.remove('hidden');
+      banner.classList.add('flex');
+
+      if (sim >= 0.99) {
+        banner.classList.add('bg-emerald-50', 'border', 'border-emerald-200', 'text-emerald-700');
+        text.textContent = 'ชื่อผู้โอนในสลิปตรงกับสมาชิก "' + memberName + '" ✓ ดึงข้อมูลครบแล้ว พร้อมบันทึก';
+        overrideWrap.classList.add('hidden');
+        overrideCheckbox.checked = false;
+        return true;
+      } else if (sim >= 0.5) {
+        banner.classList.add('bg-amber-50', 'border', 'border-amber-200', 'text-amber-800');
+        text.textContent = 'ชื่อผู้โอน "' + senderName + '" ใกล้เคียงกับ "' + memberName + '" แต่ไม่ตรงทั้งหมด กรุณาตรวจสอบก่อนยืนยัน';
+        overrideWrap.classList.remove('hidden');
+        overrideWrap.classList.add('flex');
+        return overrideCheckbox.checked;
+      } else {
+        banner.classList.add('bg-red-50', 'border', 'border-red-200', 'text-red-700');
+        text.textContent = 'ชื่อผู้โอน "' + senderName + '" ไม่ตรงกับสมาชิกที่เลือก "' + memberName + '" กรุณาตรวจสอบให้แน่ใจ';
+        overrideWrap.classList.remove('hidden');
+        overrideWrap.classList.add('flex');
+        return overrideCheckbox.checked;
+      }
+    }
+
+
     async function runOcr(slip) {
       const loading = document.getElementById('ocr-loading');
       const result = document.getElementById('ocr-result');
       const submitBtn = document.getElementById('btn-submit');
+      const badge = document.getElementById('bank-detected-badge');
       loading.classList.remove('hidden');
       loading.classList.add('flex');
       result.classList.add('hidden');
@@ -473,8 +584,25 @@
         document.getElementById('ocr-amount').value = parsed.amount || '';
         document.getElementById('ocr-date').value = normalizeDateForInput(parsed.date) || new Date().toISOString().substring(0, 10);
         document.getElementById('ocr-sender').value = parsed.senderName || '';
+
+        currentOcrExtra = {
+          senderBank: parsed.senderBank || '',
+          receiverName: parsed.receiverName || '',
+          receiverBank: parsed.receiverBank || '',
+          referenceNo: parsed.referenceNo || '',
+          bankApp: parsed.bankApp || ''
+        };
+
+        if (parsed.bankApp) {
+          badge.textContent = '🏦 ' + parsed.bankApp;
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+
         result.classList.remove('hidden');
         submitBtn.disabled = false;
+        checkNameMatch();
         if (!parsed.amount) toast('อ่านยอดเงินจากสลิปไม่ชัดเจน กรุณากรอกยอดเงินเอง', 'info');
         else toast('อ่านข้อมูลจากสลิปสำเร็จ กรุณาตรวจสอบความถูกต้อง', 'success');
       } catch (err) {
@@ -482,8 +610,11 @@
         document.getElementById('ocr-amount').value = '';
         document.getElementById('ocr-date').value = new Date().toISOString().substring(0, 10);
         document.getElementById('ocr-sender').value = '';
+        currentOcrExtra = {};
+        badge.classList.add('hidden');
         result.classList.remove('hidden');
         submitBtn.disabled = false;
+        checkNameMatch();
       } finally {
         loading.classList.add('hidden');
         loading.classList.remove('flex');
@@ -515,6 +646,12 @@
       if (!currentSlip) { toast('กรุณาแนบสลิปการโอนเงิน', 'error'); return; }
       if (!amount || amount <= 0) { toast('กรุณาระบุจำนวนเงินให้ถูกต้อง', 'error'); return; }
 
+      // ต้องชื่อตรงกัน หรือผู้ใช้ติ๊กยืนยันกรณีชื่อไม่ตรง/อ่านไม่ได้ ก่อนจึงจะบันทึกได้
+      const sim = nameSimilarity(senderName, member);
+      const nameOk = checkNameMatch();
+      if (!nameOk) { toast('กรุณาตรวจสอบชื่อผู้โอน หรือติ๊กยืนยันก่อนบันทึก', 'error'); return; }
+      const nameMatchStatus = !senderName ? 'no_sender_name' : (sim >= 0.99 ? 'matched' : (sim >= 0.5 ? 'partial_override' : 'mismatch_override'));
+
       const btn = document.getElementById('btn-submit');
       btn.disabled = true;
       btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 spin"></i><span>กำลังบันทึก...</span>';
@@ -523,6 +660,10 @@
         await apiCall('confirmTransaction', {
           type, memberName: member, amount, date, note,
           ocrSenderName: senderName,
+          ocrSenderBank: currentOcrExtra.senderBank || '',
+          ocrBankApp: currentOcrExtra.bankApp || '',
+          ocrReferenceNo: currentOcrExtra.referenceNo || '',
+          nameMatchStatus,
           imageBase64: currentSlip.base64, mimeType: currentSlip.mimeType
         });
         showDepositMsg('บันทึกรายการสำเร็จ!', false);
@@ -539,12 +680,19 @@
       }
     });
 
+
+
     function resetDepositForm() {
       document.getElementById('deposit-form').reset();
       currentSlip = null;
+      currentOcrExtra = {};
       document.getElementById('slip-preview').classList.add('hidden');
       document.getElementById('dropzone-empty').classList.remove('hidden');
       document.getElementById('ocr-result').classList.add('hidden');
+      document.getElementById('bank-detected-badge').classList.add('hidden');
+      document.getElementById('name-match-banner').classList.add('hidden');
+      document.getElementById('name-mismatch-override-wrap').classList.add('hidden');
+      document.getElementById('name-mismatch-override').checked = false;
       document.getElementById('btn-submit').disabled = true;
     }
 
