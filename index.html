@@ -522,61 +522,68 @@
 
     // ตรวจสอบชื่อผู้โอน (จาก OCR) กับสมาชิกที่เลือก แล้วอัปเดต banner/checkbox ใน UI
     // คืนค่า true หากบันทึกได้ (ชื่อตรง หรือผู้ใช้ติ๊กยืนยันแล้ว), false หากยังบันทึกไม่ได้
-    function checkNameMatch() {
-      const memberName = document.getElementById('select-member').value;
-      const senderName = document.getElementById('ocr-sender').value;
-      const banner = document.getElementById('name-match-banner');
-      const text = document.getElementById('name-match-text');
-      const overrideWrap = document.getElementById('name-mismatch-override-wrap');
-      const overrideCheckbox = document.getElementById('name-mismatch-override');
+      function checkNameMatch() {
+      const sender = document.getElementById('ocr-sender').value;
+      const member = document.getElementById('select-member').value;
+      const type = document.querySelector('input[name="txn-type"]:checked').value;
+      const confirmCheck = document.getElementById('name-confirm-check');
+      const container = document.getElementById('name-confirm-container');
+      const submitBtn = document.getElementById('btn-submit-deposit');
 
-      banner.className = 'rounded-lg p-3 text-xs font-medium items-start gap-2 hidden';
-      overrideWrap.className = 'hidden items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 cursor-pointer';
-
-      if (!memberName) {
-        overrideCheckbox.checked = false;
-        return true; 
+      if (type === 'withdraw') {
+         submitBtn.disabled = false;
+         return true;
       }
 
-      if (!senderName) {
-        banner.classList.remove('hidden');
-        banner.classList.add('flex', 'bg-gray-50', 'border', 'border-gray-200', 'text-gray-500');
-        text.textContent = 'ไม่พบชื่อผู้โอนจากสลิป กรุณาตรวจสอบยอดเงิน/ผู้โอนด้วยตนเองก่อนยืนยัน';
-        overrideWrap.classList.remove('hidden');
-        overrideWrap.classList.add('flex');
-        return overrideCheckbox.checked;
+      if (!sender || !member) {
+        container.classList.add('hidden');
+        submitBtn.disabled = true;
+        return false;
       }
 
-      const sim = nameSimilarity(senderName, memberName);
-      banner.classList.remove('hidden');
-      banner.classList.add('flex');
+      // ตรวจสอบชื่อผู้รับปลายทางจาก currentSlip
+      let isReceiverValid = true;
+      if (type === 'deposit' && currentSlip) {
+         // ดึงข้อมูลชื่อผู้รับที่อ่านได้จาก SlipOK
+         const receiver = currentSlip.receiver || {};
+         const receiverName = receiver.displayName || receiver.name || currentSlip.receiverName || '';
+         const rxNameCheck = receiverName.replace(/\s+/g, '');
+         
+         // ตรวจสอบว่าต้องมี สุวดี และ หีมปอง
+         if (!rxNameCheck.includes('สุวดี') || !rxNameCheck.includes('หีมปอง')) {
+             isReceiverValid = false;
+         }
+      }
 
-      if (sim >= 0.99) {
-        // ชื่อตรงเป๊ะ 100%
-        banner.classList.add('bg-emerald-50', 'border', 'border-emerald-200', 'text-emerald-700');
-        text.textContent = 'ชื่อผู้โอนในสลิปตรงกับสมาชิก "' + memberName + '" ✓ ดึงข้อมูลครบแล้ว พร้อมบันทึก';
-        overrideWrap.classList.add('hidden');
-        overrideCheckbox.checked = false;
+      const sim = nameSimilarity(sender, member);
+      
+      // กรณีชื่อผู้รับผิด (โอนไปบัญชีอื่น)
+      if (!isReceiverValid) {
+         confirmCheck.checked = false;
+         confirmCheck.disabled = true; // ล็อคไม่ให้กดติ๊กได้เด็ดขาด
+         submitBtn.disabled = true;
+         // เปลี่ยนข้อความแจ้งเตือนโดยไม่กระทบหน้าตา UI หลัก
+         container.querySelector('span').innerHTML = '<strong class="text-red-600">ข้อผิดพลาด:</strong> บัญชีผู้รับปลายทางไม่ใช่ "นาง สุวดี หีมปอง"<br>ไม่สามารถบันทึกรายการนี้ได้เด็ดขาด';
+         container.classList.remove('hidden');
+         return false;
+      }
+
+      // กรณีชื่อผู้รับถูกต้อง ให้คืนค่าข้อความเดิม
+      container.querySelector('span').innerHTML = '<strong>ชื่อผู้โอนไม่ตรงกับชื่อสมาชิก</strong><br>ฉันยืนยันว่ารายการนี้เป็นของสมาชิกที่เลือกจริง';
+      confirmCheck.disabled = false; // ปลดล็อคให้กดได้
+
+      if (sim > 0.6) {
+        container.classList.add('hidden');
+        confirmCheck.checked = true; // ติ๊กอัตโนมัติ
+        submitBtn.disabled = false;
         return true;
-      } else if (sim >= 0.5) {
-        // ชื่อตรงแค่บางส่วน (เราดักไว้แค่ชื่อจริง) -> สีเหลือง
-        banner.classList.add('bg-amber-50', 'border', 'border-amber-200', 'text-amber-800');
-        text.textContent = 'ชื่อผู้โอน "' + senderName + '" ตรงกันเฉพาะชื่อ ระบบได้ทำการติ๊กยืนยันให้อัตโนมัติแล้ว ✓';
-        overrideWrap.classList.remove('hidden');
-        overrideWrap.classList.add('flex');
-        
-        // 🌟 บังคับติ๊กถูกให้อัตโนมัติ และอนุญาตให้ปุ่ม "บันทึก" ทำงานได้เลย
-        overrideCheckbox.checked = true;
-        return true; 
       } else {
-        // ชื่อไม่ตรงกันเลย -> สีแดง
-        banner.classList.add('bg-red-50', 'border', 'border-red-200', 'text-red-700');
-        text.textContent = 'ชื่อผู้โอน "' + senderName + '" ไม่ตรงกับสมาชิกที่เลือก "' + memberName + '" กรุณาตรวจสอบให้แน่ใจ';
-        overrideWrap.classList.remove('hidden');
-        overrideWrap.classList.add('flex');
-        return overrideCheckbox.checked;
+        container.classList.remove('hidden');
+        submitBtn.disabled = !confirmCheck.checked;
+        return confirmCheck.checked;
       }
     }
+
 
 
     async function runOcr(slip) {
