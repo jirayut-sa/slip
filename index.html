@@ -179,6 +179,12 @@
               <span id="bank-detected-badge" class="hidden text-[11px] font-semibold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full whitespace-nowrap"></span>
             </div>
 
+            <!-- ตรวจสอบชื่อผู้รับ (ไปยัง) ต้องเป็น นาง สุวดี หีมปอง เท่านั้น -->
+            <div id="receiver-check-banner" class="hidden rounded-lg p-3 text-xs font-medium items-start gap-2">
+              <i data-lucide="shield-check" class="w-4 h-4 shrink-0 mt-0.5"></i>
+              <span id="receiver-check-text"></span>
+            </div>
+
             <!-- สถานะตรวจสอบชื่อผู้โอนเทียบกับสมาชิกที่เลือก -->
             <div id="name-match-banner" class="hidden rounded-lg p-3 text-xs font-medium items-start gap-2">
               <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5"></i>
@@ -579,6 +585,40 @@
     }
 
 
+    // ตรวจสอบชื่อผู้รับ (จาก OCR) ต้องเป็น นาง สุวดี หีมปอง เท่านั้น
+    // คืนค่า true ถ้าชื่อถูกต้อง หรือไม่พบชื่อผู้รับใน OCR
+    // คืนค่า false ถ้าพบชื่อผู้รับแต่ไม่ตรงกับชื่อที่กำหนด
+    const REQUIRED_RECEIVER = 'นาง สุวดี หีมปอง';
+
+    function checkReceiverName() {
+      const receiverName = (currentOcrExtra.receiverName || '').trim();
+      const banner = document.getElementById('receiver-check-banner');
+      const text = document.getElementById('receiver-check-text');
+
+      // ถ้าไม่พบชื่อผู้รับจาก OCR → ซ่อน banner ไม่บล็อก
+      if (!receiverName) {
+        banner.className = 'hidden rounded-lg p-3 text-xs font-medium items-start gap-2';
+        return true;
+      }
+
+      const normalized = receiverName.replace(/\s+/g, ' ');
+      const isMatch = normalized.includes('สุวดี') && normalized.includes('หีมปอง');
+
+      banner.classList.remove('hidden');
+      banner.classList.add('flex');
+
+      if (isMatch) {
+        banner.className = 'rounded-lg p-3 text-xs font-medium flex items-start gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700';
+        text.textContent = 'ชื่อผู้รับเงิน "' + receiverName + '" ตรงกับ ' + REQUIRED_RECEIVER + ' ✓';
+        return true;
+      } else {
+        banner.className = 'rounded-lg p-3 text-xs font-medium flex items-start gap-2 bg-red-50 border border-red-200 text-red-700';
+        text.textContent = '⚠ ชื่อผู้รับเงิน "' + receiverName + '" ไม่ตรงกับ ' + REQUIRED_RECEIVER + ' กรุณาตรวจสอบสลิปให้แน่ใจ';
+        return false;
+      }
+    }
+
+
     async function runOcr(slip) {
       const loading = document.getElementById('ocr-loading');
       const result = document.getElementById('ocr-result');
@@ -613,6 +653,7 @@
         result.classList.remove('hidden');
         submitBtn.disabled = false;
         checkNameMatch();
+        checkReceiverName();
         if (!parsed.amount) toast('อ่านยอดเงินจากสลิปไม่ชัดเจน กรุณากรอกยอดเงินเอง', 'info');
         else toast('อ่านข้อมูลจากสลิปสำเร็จ กรุณาตรวจสอบความถูกต้อง', 'success');
       } catch (err) {
@@ -625,6 +666,7 @@
         result.classList.remove('hidden');
         submitBtn.disabled = false;
         checkNameMatch();
+        checkReceiverName();
       } finally {
         loading.classList.add('hidden');
         loading.classList.remove('flex');
@@ -634,23 +676,54 @@
 
         function normalizeDateForInput(d) {
       if (!d) return null;
-      const m = String(d).match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+      const s = String(d).trim();
+
+      // ตารางแปลงชื่อเดือนไทย (ย่อ + เต็ม) → เลขเดือน
+      const thaiMonthMap = {
+        'ม.ค.': '01', 'มกราคม': '01',
+        'ก.พ.': '02', 'กุมภาพันธ์': '02',
+        'มี.ค.': '03', 'มีนาคม': '03',
+        'เม.ย.': '04', 'เมษายน': '04',
+        'พ.ค.': '05', 'พฤษภาคม': '05',
+        'มิ.ย.': '06', 'มิถุนายน': '06',
+        'ก.ค.': '07', 'กรกฎาคม': '07',
+        'ส.ค.': '08', 'สิงหาคม': '08',
+        'ก.ย.': '09', 'กันยายน': '09',
+        'ต.ค.': '10', 'ตุลาคม': '10',
+        'พ.ย.': '11', 'พฤศจิกายน': '11',
+        'ธ.ค.': '12', 'ธันวาคม': '12'
+      };
+
+      // รองรับรูปแบบวันที่ไทย เช่น "27 มิ.ย. 2569" หรือ "27 มิถุนายน 2569"
+      const thaiPattern = /(\d{1,2})\s+(ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+(\d{4})/;
+      const thaiMatch = s.match(thaiPattern);
+      if (thaiMatch) {
+        const dd = thaiMatch[1];
+        const monthKey = thaiMatch[2];
+        let y = parseInt(thaiMatch[3], 10);
+        const mm = thaiMonthMap[monthKey];
+        if (mm) {
+          // ปี พ.ศ. (> 2400) → แปลงเป็น ค.ศ.
+          if (y > 2400) y -= 543;
+          return `${y}-${mm}-${String(dd).padStart(2, '0')}`;
+        }
+      }
+
+      // รูปแบบเดิม: DD/MM/YYYY หรือ DD-MM-YYYY หรือ DD.MM.YYYY
+      const m = s.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
       if (!m) return null;
       let [, dd, mm, yyyy] = m;
       let y = parseInt(yyyy, 10);
 
-      // 1. ถ้าในสลิปมาเป็นปี 2 หลัก (เช่น 67 หรือ 24)
+      // ถ้าในสลิปมาเป็นปี 2 หลัก (เช่น 67 หรือ 24)
       if (yyyy.length === 2) {
         if (y >= 50) y += 2500;
         else y += 2000;
       }
 
-      // 2. ถ้าปีมากกว่า 2400 (รวมถึงกรณีมาเป็น 4 หลัก เช่น 2569) 
-      // ถือว่าเป็น พ.ศ. ให้ลบ 543 เพื่อให้กลายเป็น ค.ศ. (Input type="date" ต้องใช้ ค.ศ. ในการแสดงผล)
-      if (y > 2400) {
-        y -= 543;
-      }
-      
+      // ถ้าปีมากกว่า 2400 (เช่น 2569 พ.ศ.) → แปลงเป็น ค.ศ.
+      if (y > 2400) y -= 543;
+
       return `${y}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
     }
 
@@ -672,6 +745,10 @@
       const sim = nameSimilarity(senderName, member);
       const nameOk = checkNameMatch();
       if (!nameOk) { toast('กรุณาตรวจสอบชื่อผู้โอน หรือติ๊กยืนยันก่อนบันทึก', 'error'); return; }
+
+      // ตรวจสอบชื่อผู้รับ ต้องเป็น นาง สุวดี หีมปอง เท่านั้น
+      const receiverOk = checkReceiverName();
+      if (!receiverOk) { toast('ชื่อผู้รับในสลิปไม่ตรงกับ ' + REQUIRED_RECEIVER + ' ไม่สามารถบันทึกรายการนี้ได้', 'error'); return; }
       const nameMatchStatus = !senderName ? 'no_sender_name' : (sim >= 0.99 ? 'matched' : (sim >= 0.5 ? 'partial_override' : 'mismatch_override'));
 
       const btn = document.getElementById('btn-submit');
@@ -713,6 +790,7 @@
       document.getElementById('ocr-result').classList.add('hidden');
       document.getElementById('bank-detected-badge').classList.add('hidden');
       document.getElementById('name-match-banner').classList.add('hidden');
+      document.getElementById('receiver-check-banner').classList.add('hidden');
       document.getElementById('name-mismatch-override-wrap').classList.add('hidden');
       document.getElementById('name-mismatch-override').checked = false;
       document.getElementById('btn-submit').disabled = true;
