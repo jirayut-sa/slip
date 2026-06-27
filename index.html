@@ -632,16 +632,30 @@
       }
     }
 
-    function normalizeDateForInput(d) {
+      function normalizeDateForInput(d) {
       if (!d) return null;
-      const m = String(d).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+      const m = String(d).match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
       if (!m) return null;
       let [, dd, mm, yyyy] = m;
-      if (yyyy.length === 2) yyyy = '20' + yyyy;
       let y = parseInt(yyyy, 10);
-      if (y > 2400) y -= 543; // แปลงปี พ.ศ. เป็น ค.ศ. ถ้าจำเป็น
+
+      // 1. จัดการกรณีปีในสลิปมีแค่ 2 หลัก (เช่น 67 หรือ 24)
+      if (yyyy.length === 2) {
+        if (y >= 50) { 
+          y += 2500; // ถ้าเป็น 50 ขึ้นไป ถือว่าเป็น พ.ศ. (เช่น 67 -> 2567)
+        } else {
+          y += 2000; // ถ้าน้อยกว่า 50 ถือว่าเป็น ค.ศ. (เช่น 24 -> 2024)
+        }
+      }
+
+      // 2. ถ้าปีมากกว่า 2400 แสดงว่าเป็น พ.ศ. ให้แปลงกลับเป็น ค.ศ. (ลบ 543)
+      if (y > 2400) {
+        y -= 543;
+      }
+      
       return `${y}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
     }
+
 
     document.getElementById('deposit-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -655,6 +669,25 @@
       if (!member) { toast('กรุณาเลือกชื่อสมาชิก', 'error'); return; }
       if (!currentSlip) { toast('กรุณาแนบสลิปการโอนเงิน', 'error'); return; }
       if (!amount || amount <= 0) { toast('กรุณาระบุจำนวนเงินให้ถูกต้อง', 'error'); return; }
+         // ==========================================
+      // เริ่มส่วนที่เพิ่มใหม่: ตรวจสอบชื่อผู้รับเงินปลายทาง
+      // ==========================================
+      if (type === 'deposit') {
+        const receiverName = currentOcrExtra.receiverName || '';
+        // ตัดช่องว่างทิ้ง เพื่อป้องกันปัญหาการอ่านเว้นวรรคของ OCR
+        const rxNameCheck = receiverName.replace(/\s+/g, '');
+        
+        // เช็คว่าต้องมีคำว่า "สุวดี" และ "หีมปอง" อยู่ในชื่อ
+        if (!rxNameCheck.includes('สุวดี') || !rxNameCheck.includes('หีมปอง')) {
+          toast('บันทึกไม่ได้: บัญชีผู้รับเงินปลายทางต้องเป็น "นาง สุวดี หีมปอง" เท่านั้น', 'error');
+          return; // สั่ง return เพื่อหยุดการทำงาน (ไม่ให้บันทึก)
+        }
+      }
+      // ==========================================
+      // สิ้นสุดส่วนที่เพิ่มใหม่
+      // ==========================================
+
+
 
       // ต้องชื่อตรงกัน หรือผู้ใช้ติ๊กยืนยันกรณีชื่อไม่ตรง/อ่านไม่ได้ ก่อนจึงจะบันทึกได้
       const sim = nameSimilarity(senderName, member);
