@@ -102,13 +102,18 @@
           <p class="text-xs text-gray-600">ยอดใช้จ่ายทั้งหมด</p>
           <p id="val-expense" class="text-lg sm:text-2xl font-extrabold text-gray-900 mt-1">฿0</p>
         </div>
-        <div class="card-hover stat-card rounded-2xl p-4 sm:p-6 border border-white/60 shadow-lg">
+        <button id="monthly-deposit-card" type="button" onclick="openDepositCycleModal()" aria-haspopup="dialog" aria-controls="deposit-cycle-modal" class="card-hover stat-card rounded-2xl p-4 sm:p-6 border border-white/60 shadow-lg text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
           <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mb-3">
             <i data-lucide="trending-up" class="w-4 h-4 sm:w-5 sm:h-5 text-white"></i>
           </div>
-          <p class="text-xs text-gray-600">ยอดฝากเดือนนี้</p>
-          <p id="val-month-deposit" class="text-lg sm:text-2xl font-extrabold text-gray-900 mt-1">฿0</p>
-        </div>
+          <p id="deposit-cycle-label" class="text-xs text-gray-600">ยอดฝากเดือนนี้</p>
+          <p id="val-month-deposit" class="text-lg sm:text-2xl font-extrabold mt-1">
+            <span class="text-red-500">0 บาท</span>
+            <span class="text-gray-400"> / </span>
+            <span class="text-emerald-600">7,800 บาท</span>
+          </p>
+          <p id="deposit-cycle-hint" class="text-[11px] text-emerald-700 mt-2 flex items-center gap-1"><i data-lucide="users" class="w-3.5 h-3.5"></i>แตะเพื่อดูผู้ที่ยังไม่โอน</p>
+        </button>
         <div class="card-hover stat-card rounded-2xl p-4 sm:p-6 border border-white/60 shadow-lg">
           <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center mb-3">
             <i data-lucide="receipt" class="w-4 h-4 sm:w-5 sm:h-5 text-white"></i>
@@ -166,26 +171,22 @@
             </div>
           </div>
 
-          <!-- OCR scanning state -->
           <div id="ocr-loading" class="hidden items-center gap-3 bg-blue-50 border border-blue-100 rounded-xl p-4 text-blue-700 text-sm">
             <i data-lucide="loader-2" class="w-5 h-5 spin"></i>
             <span>กำลังอ่านข้อมูลจากสลิป...</span>
           </div>
 
-          <!-- OCR result -->
           <div id="ocr-result" class="hidden pop-in bg-teal-50 border border-teal-200 rounded-xl p-4 space-y-3">
             <div class="flex items-center justify-between gap-2 flex-wrap">
               <p class="text-xs font-bold text-teal-700 flex items-center gap-1.5"><i data-lucide="scan-line" class="w-4 h-4"></i> ข้อมูลที่อ่านได้จากสลิป (ตรวจสอบก่อนยืนยัน)</p>
               <span id="bank-detected-badge" class="hidden text-[11px] font-semibold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full whitespace-nowrap"></span>
             </div>
 
-            <!-- ตรวจสอบชื่อผู้รับที่กำหนด หาก OCR อ่านไม่พบ/คลาดเคลื่อนให้เตือนแต่ยังบันทึกได้ -->
             <div id="receiver-check-banner" class="hidden rounded-lg p-3 text-xs font-medium items-start gap-2">
               <i data-lucide="shield-check" class="w-4 h-4 shrink-0 mt-0.5"></i>
               <span id="receiver-check-text"></span>
             </div>
 
-            <!-- สถานะตรวจสอบชื่อผู้โอนเทียบกับสมาชิกที่เลือก -->
             <div id="name-match-banner" class="hidden rounded-lg p-3 text-xs font-medium items-start gap-2">
               <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5"></i>
               <span id="name-match-text"></span>
@@ -206,7 +207,6 @@
               <input id="ocr-sender" type="text" class="w-full border border-teal-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500" placeholder="ไม่พบข้อมูล">
             </div>
 
-            <!-- แสดงเมื่อชื่อไม่ตรง: ต้องติ๊กยืนยันก่อนจึงจะบันทึกได้ -->
             <label id="name-mismatch-override-wrap" class="hidden items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 cursor-pointer">
               <input id="name-mismatch-override" type="checkbox" class="mt-0.5">
               <span>ชื่อผู้โอนในสลิปไม่ตรงกับสมาชิกที่เลือก แต่ฉันตรวจสอบแล้วว่าข้อมูลถูกต้อง ต้องการบันทึกรายการนี้ต่อ</span>
@@ -273,6 +273,39 @@
 
   </main>
 
+  <!-- รายละเอียดรอบเก็บเงินและสมาชิกที่ยังไม่โอน -->
+  <div id="deposit-cycle-modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-slate-900/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="deposit-cycle-modal-title" onclick="handleDepositCycleBackdrop(event)">
+    <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-white/70 overflow-hidden pop-in">
+      <div class="gradient-header px-5 py-4 flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <p class="text-xs text-blue-100">รายละเอียดการเก็บเงิน</p>
+          <h2 id="deposit-cycle-modal-title" class="text-lg font-bold text-white truncate">ยอดฝากเดือนนี้</h2>
+        </div>
+        <button id="close-deposit-cycle-modal" type="button" onclick="closeDepositCycleModal()" class="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white" aria-label="ปิดหน้าต่าง">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-5 sm:p-6">
+        <div class="grid grid-cols-2 gap-3 mb-5">
+          <div class="rounded-xl bg-emerald-50 border border-emerald-100 p-3">
+            <p class="text-xs text-emerald-700">ยอดปัจจุบัน</p>
+            <p id="cycle-modal-total" class="text-lg font-extrabold text-emerald-700 mt-1">0 บาท</p>
+          </div>
+          <div class="rounded-xl bg-blue-50 border border-blue-100 p-3">
+            <p class="text-xs text-blue-700">เป้าหมาย</p>
+            <p class="text-lg font-extrabold text-blue-700 mt-1">7,800 บาท</p>
+          </div>
+        </div>
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <h3 class="font-bold text-gray-900 flex items-center gap-2"><i data-lucide="user-x" class="w-5 h-5 text-red-500"></i>ยังไม่โอน/แนบสลิป</h3>
+          <span id="cycle-missing-count" class="text-xs font-bold rounded-full bg-red-100 text-red-600 px-2.5 py-1">0 คน</span>
+        </div>
+        <div id="cycle-missing-list" class="space-y-2 max-h-72 overflow-y-auto"></div>
+        <p id="cycle-modal-note" class="text-xs text-gray-500 mt-4 leading-relaxed"></p>
+      </div>
+    </div>
+  </div>
+
   <footer class="text-center py-6 text-xs text-gray-400 border-t border-gray-100 mt-8">
     <p>ระบบบันทึกการเก็บเงิน Section 1 • นักศึกษาหลักสูตรศึกษาศาสตรมหาบัณฑิต สาขาวิชาการบริหารการศึกษา มหาวิทยาลัยหาดใหญ่</p>
   </footer>
@@ -289,9 +322,11 @@
 
     let state = { members: [], transactions: [] };
     let adminUnlocked = false;
-    let currentSlip = null; // { base64, mimeType }
-    let currentOcrExtra = {}; // { senderBank, receiverName, receiverBank, referenceNo, bankApp }
+    let currentSlip = null;
+    let currentOcrExtra = {};
     let currentUploadDate = '';
+    const MONTHLY_DEPOSIT_TARGET = 7800;
+    let activeDepositCycle = null;
 
     // ---------------- Utilities ----------------
     function toast(message, type = 'success') {
@@ -308,13 +343,92 @@
 
     function fmtCurrency(n) { return '฿' + (Number(n) || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 }); }
 
-    // วันที่ปัจจุบันตามเวลาท้องถิ่นของอุปกรณ์ (ไม่ใช้ UTC และไม่อ่านจากสลิป)
     function getLocalToday() {
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
+    }
+
+    function getCurrentMonthKey() {
+      return getLocalToday().substring(0, 7);
+    }
+
+    function normalizeMonthKey(value) {
+      const match = String(value || '').match(/^(\d{4})-(\d{2})/);
+      return match ? `${match[1]}-${match[2]}` : '';
+    }
+
+    function nextMonthKey(monthKey) {
+      const match = String(monthKey || '').match(/^(\d{4})-(\d{2})$/);
+      if (!match) return getCurrentMonthKey();
+      let year = Number(match[1]);
+      let month = Number(match[2]) + 1;
+      if (month > 12) { month = 1; year += 1; }
+      return `${year}-${String(month).padStart(2, '0')}`;
+    }
+
+    function formatThaiMonth(monthKey) {
+      const match = String(monthKey || '').match(/^(\d{4})-(\d{2})$/);
+      if (!match) return 'เดือนนี้';
+      const monthNames = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+      return `${monthNames[Number(match[2]) - 1]} ${Number(match[1]) + 543}`;
+    }
+
+    function transactionTimeValue(transaction, fallbackIndex) {
+      const source = transaction.createdAt || transaction.date || '';
+      const parsed = Date.parse(source);
+      return Number.isFinite(parsed) ? parsed : fallbackIndex;
+    }
+
+    // แบ่งรายการฝากเป็นรอบต่อเนื่อง รอบเดิมจะไม่เปลี่ยนเดือนจนกว่ายอดครบ 7,800 บาท
+    function getActiveDepositCycle() {
+      const deposits = state.transactions
+        .map((transaction, index) => ({ transaction, index }))
+        .filter(item => (Number(item.transaction.amount) || 0) > 0)
+        .sort((a, b) => transactionTimeValue(a.transaction, a.index) - transactionTimeValue(b.transaction, b.index));
+
+      let cycle = null;
+      let lastCompletedMonth = '';
+
+      deposits.forEach(item => {
+        const transaction = item.transaction;
+        if (!cycle) {
+          cycle = {
+            monthKey: normalizeMonthKey(transaction.date) || getCurrentMonthKey(),
+            total: 0,
+            transactions: [],
+            paidMemberNames: new Set()
+          };
+        }
+
+        cycle.total += Number(transaction.amount) || 0;
+        cycle.transactions.push(transaction);
+        if (transaction.memberName && transaction.slipUrl) {
+          cycle.paidMemberNames.add(String(transaction.memberName).trim());
+        }
+
+        if (cycle.total >= MONTHLY_DEPOSIT_TARGET) {
+          lastCompletedMonth = cycle.monthKey;
+          cycle = null;
+        }
+      });
+
+      if (!cycle) {
+        const suggestedMonth = lastCompletedMonth ? nextMonthKey(lastCompletedMonth) : getCurrentMonthKey();
+        cycle = {
+          monthKey: suggestedMonth > getCurrentMonthKey() ? suggestedMonth : getCurrentMonthKey(),
+          total: 0,
+          transactions: [],
+          paidMemberNames: new Set()
+        };
+      }
+
+      cycle.missingMembers = state.members.filter(member => {
+        return !cycle.paidMemberNames.has(String(member.name || '').trim());
+      });
+      return cycle;
     }
 
     function countUp(el, target) {
@@ -384,6 +498,7 @@
       });
       if (tab === 'dashboard') renderDashboard();
     }
+
     function syncTabBtn(t, active) {
       const btn = document.getElementById('tab-' + t);
       btn.classList.toggle('tab-active', active);
@@ -411,16 +526,36 @@
       const txns = state.transactions;
       const now = new Date();
       const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-      let totalDeposit = 0, totalExpense = 0, monthDeposit = 0, monthExpense = 0;
+      let totalDeposit = 0, totalExpense = 0, monthExpense = 0;
       txns.forEach(t => {
         const amt = Number(t.amount) || 0;
         const month = String(t.date || '').substring(0, 7);
-        if (amt > 0) { totalDeposit += amt; if (month === thisMonth) monthDeposit += amt; }
+        if (amt > 0) { totalDeposit += amt; }
         else { totalExpense += Math.abs(amt); if (month === thisMonth) monthExpense += Math.abs(amt); }
       });
       countUp(document.getElementById('val-balance'), totalDeposit - totalExpense);
       countUp(document.getElementById('val-expense'), totalExpense);
-      countUp(document.getElementById('val-month-deposit'), monthDeposit);
+
+      // ใช้รอบเก็บเงินจริง: หากยังไม่ครบเป้า ให้คงรอบเดิมแม้เดือนปฏิทินจะเปลี่ยน
+      activeDepositCycle = getActiveDepositCycle();
+      const monthDeposit = activeDepositCycle.total;
+      const monthDepositElement = document.getElementById('val-month-deposit');
+      const currentDepositText = monthDeposit.toLocaleString('th-TH', { maximumFractionDigits: 2 });
+      const targetDepositText = MONTHLY_DEPOSIT_TARGET.toLocaleString('th-TH');
+      const cycleMonthText = formatThaiMonth(activeDepositCycle.monthKey);
+      document.getElementById('deposit-cycle-label').textContent = 'ยอดฝากรอบเดือน ' + cycleMonthText;
+      document.getElementById('deposit-cycle-hint').innerHTML = `<i data-lucide="users" class="w-3.5 h-3.5"></i>ยังไม่โอน/แนบสลิป ${activeDepositCycle.missingMembers.length} คน • แตะเพื่อดูรายชื่อ`;
+
+      if (monthDeposit >= MONTHLY_DEPOSIT_TARGET) {
+        monthDepositElement.innerHTML = `<span class="text-emerald-600">${currentDepositText} บาท / ${targetDepositText} บาท</span>`;
+      } else {
+        monthDepositElement.innerHTML = `
+          <span class="text-red-500">${currentDepositText} บาท</span>
+          <span class="text-gray-400"> / </span>
+          <span class="text-emerald-600">${targetDepositText} บาท</span>
+        `;
+      }
+
       countUp(document.getElementById('val-month-expense'), monthExpense);
 
       const list = document.getElementById('history-list');
@@ -451,6 +586,60 @@
       lucide.createIcons();
     }
 
+    function renderDepositCycleModal() {
+      const cycle = activeDepositCycle || getActiveDepositCycle();
+      const cycleMonthText = formatThaiMonth(cycle.monthKey);
+      document.getElementById('deposit-cycle-modal-title').textContent = 'ยอดฝากรอบเดือน ' + cycleMonthText;
+      document.getElementById('cycle-modal-total').textContent = cycle.total.toLocaleString('th-TH', { maximumFractionDigits: 2 }) + ' บาท';
+      document.getElementById('cycle-missing-count').textContent = cycle.missingMembers.length + ' คน';
+
+      const list = document.getElementById('cycle-missing-list');
+      if (state.members.length === 0) {
+        list.innerHTML = '<p class="text-gray-400 text-sm text-center py-6">ยังไม่มีรายชื่อสมาชิกในระบบ</p>';
+      } else if (cycle.missingMembers.length === 0) {
+        list.innerHTML = '<div class="rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-medium p-4 flex items-center gap-2"><i data-lucide="circle-check" class="w-5 h-5 shrink-0"></i>สมาชิกทุกคนโอนและแนบสลิปแล้ว</div>';
+      } else {
+        list.innerHTML = cycle.missingMembers.map((member, index) => `
+          <div class="flex items-center gap-3 rounded-xl bg-red-50/70 border border-red-100 px-3 py-2.5">
+            <div class="w-7 h-7 rounded-full bg-red-100 text-red-600 text-xs font-bold flex items-center justify-center shrink-0">${index + 1}</div>
+            <span class="text-sm font-medium text-gray-800">${escapeHtml(member.name || '')}</span>
+          </div>`).join('');
+      }
+
+      const remaining = Math.max(0, MONTHLY_DEPOSIT_TARGET - cycle.total);
+      document.getElementById('cycle-modal-note').textContent = remaining > 0
+        ? `รอบ ${cycleMonthText} จะยังคงแสดงต่อไปจนกว่ายอดฝากจะครบ 7,800 บาท (เหลืออีก ${remaining.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท)`
+        : `รอบ ${cycleMonthText} ครบเป้าหมายแล้ว ระบบจะเริ่มรอบเดือนใหม่โดยอัตโนมัติ`;
+      lucide.createIcons();
+    }
+
+    function openDepositCycleModal() {
+      renderDepositCycleModal();
+      const modal = document.getElementById('deposit-cycle-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => document.getElementById('close-deposit-cycle-modal').focus(), 0);
+    }
+
+    function closeDepositCycleModal() {
+      const modal = document.getElementById('deposit-cycle-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      document.body.style.overflow = '';
+      document.getElementById('monthly-deposit-card').focus();
+    }
+
+    function handleDepositCycleBackdrop(event) {
+      if (event.target === event.currentTarget) closeDepositCycleModal();
+    }
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !document.getElementById('deposit-cycle-modal').classList.contains('hidden')) {
+        closeDepositCycleModal();
+      }
+    });
+
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
@@ -477,7 +666,6 @@
       if (file) handleSlipFile(file);
     });
 
-    // เปลี่ยนสมาชิกที่เลือก / แก้ไขชื่อผู้โอนเอง / ติ๊กยืนยันกรณีชื่อไม่ตรง → ตรวจสอบชื่อใหม่ทุกครั้ง
     document.getElementById('select-member').addEventListener('change', () => {
       if (!document.getElementById('ocr-result').classList.contains('hidden')) checkNameMatch();
     });
@@ -508,38 +696,31 @@
     function normalizeThaiName(name) {
       if (!name) return '';
       let s = String(name).trim();
-      // ตัดคำนำหน้าชื่อทั้งไทย/อังกฤษออกก่อนเทียบ
       s = s.replace(/^(นาย|นาง|นางสาว|น\.ส\.|ด\.ช\.|ด\.ญ\.|คุณ|Mr\.?|Mrs\.?|Ms\.?|Miss)\s*/i, '');
       s = s.replace(/\s+/g, ' ').trim();
       return s.toLowerCase();
     }
 
-    // คืนค่าความใกล้เคียง 0-1 ระหว่างชื่อสองชื่อ โดยเทียบทีละคำ (รองรับนามสกุลเดียวกันแต่สลับลำดับ,
-    // ชื่อที่ถูกตัด/มาสก์บางส่วน เช่น "สมชาย ใ*****" และคำนำหน้าที่ต่างกัน)
     function nameSimilarity(a, b) {
       const na = normalizeThaiName(a);
       const nb = normalizeThaiName(b);
       if (!na || !nb) return 0;
-      if (na === nb) return 1; // ตรงเป๊ะทุกตัวอักษร
-      
+      if (na === nb) return 1;
+
       const tokensA = na.split(' ').filter(Boolean);
       const tokensB = nb.split(' ').filter(Boolean);
       if (!tokensA.length || !tokensB.length) return 0;
-      
-      // ดึงแค่คำแรก (ชื่อจริง) มาเทียบกัน
+
       const firstNameA = tokensA[0];
       const firstNameB = tokensB[0];
-      
-      // ถ้าชื่อจริงตรงกัน ให้คะแนน 0.8 (ถือว่าตรงกันบางส่วน เพื่อสั่งให้โชว์กล่องติ๊กยืนยัน)
+
       if (firstNameA === firstNameB || firstNameA.includes(firstNameB) || firstNameB.includes(firstNameA)) {
-        return 0.8; 
+        return 0.8;
       }
-      
-      return 0; // ไม่ตรงเลย
+
+      return 0;
     }
 
-    // ตรวจสอบชื่อผู้โอน (จาก OCR) กับสมาชิกที่เลือก แล้วอัปเดต banner/checkbox ใน UI
-    // คืนค่า true หากบันทึกได้ (ชื่อตรง หรือผู้ใช้ติ๊กยืนยันแล้ว), false หากยังบันทึกไม่ได้
     function checkNameMatch() {
       const memberName = document.getElementById('select-member').value;
       const senderName = document.getElementById('ocr-sender').value;
@@ -553,7 +734,7 @@
 
       if (!memberName) {
         overrideCheckbox.checked = false;
-        return true; 
+        return true;
       }
 
       if (!senderName) {
@@ -570,24 +751,19 @@
       banner.classList.add('flex');
 
       if (sim >= 0.99) {
-        // ชื่อตรงเป๊ะ 100%
         banner.classList.add('bg-emerald-50', 'border', 'border-emerald-200', 'text-emerald-700');
         text.textContent = 'ชื่อผู้โอนในสลิปตรงกับสมาชิก "' + memberName + '" ✓ ดึงข้อมูลครบแล้ว พร้อมบันทึก';
         overrideWrap.classList.add('hidden');
         overrideCheckbox.checked = false;
         return true;
       } else if (sim >= 0.5) {
-        // ชื่อตรงแค่บางส่วน (เราดักไว้แค่ชื่อจริง) -> สีเหลือง
         banner.classList.add('bg-amber-50', 'border', 'border-amber-200', 'text-amber-800');
         text.textContent = 'ชื่อผู้โอน "' + senderName + '" ตรงกันเฉพาะชื่อ ระบบได้ทำการติ๊กยืนยันให้อัตโนมัติแล้ว ✓';
         overrideWrap.classList.remove('hidden');
         overrideWrap.classList.add('flex');
-        
-        // 🌟 บังคับติ๊กถูกให้อัตโนมัติ และอนุญาตให้ปุ่ม "บันทึก" ทำงานได้เลย
         overrideCheckbox.checked = true;
-        return true; 
+        return true;
       } else {
-        // ชื่อไม่ตรงกันเลย -> สีแดง
         banner.classList.add('bg-red-50', 'border', 'border-red-200', 'text-red-700');
         text.textContent = 'ชื่อผู้โอน "' + senderName + '" ไม่ตรงกับสมาชิกที่เลือก "' + memberName + '" กรุณาตรวจสอบให้แน่ใจ';
         overrideWrap.classList.remove('hidden');
@@ -596,10 +772,6 @@
       }
     }
 
-
-    // ชื่อผู้รับที่ยอมรับ:
-    // สุวดี หีมปอง / นาง สุวดี หีมปอง / Suwadee Heempong
-    // หาก OCR อ่านไม่พบหรืออ่านผิด ให้แสดงคำเตือนแต่ยังอนุญาตให้บันทึกได้
     const REQUIRED_RECEIVER = 'สุวดี หีมปอง / นาง สุวดี หีมปอง / Suwadee Heempong';
 
     function checkReceiverName() {
@@ -607,7 +779,6 @@
       const banner = document.getElementById('receiver-check-banner');
       const text = document.getElementById('receiver-check-text');
 
-      // ถ้าไม่พบชื่อผู้รับจาก OCR → แจ้งเตือน แต่ไม่บล็อกการบันทึก
       if (!receiverName) {
         banner.className = 'rounded-lg p-3 text-xs font-medium flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800';
         text.textContent = 'ระบบไม่พบชื่อผู้รับจากสลิป กรุณาตรวจสอบด้วยตนเอง (ยังสามารถบันทึกได้)';
@@ -637,7 +808,6 @@
         return true;
       }
     }
-
 
     async function runOcr(slip) {
       const loading = document.getElementById('ocr-loading');
@@ -694,11 +864,10 @@
       }
     }
 
-        function normalizeDateForInput(d) {
+    function normalizeDateForInput(d) {
       if (!d) return null;
       const s = String(d).trim();
 
-      // ตารางแปลงชื่อเดือนไทย (ย่อ + เต็ม) → เลขเดือน
       const thaiMonthMap = {
         'ม.ค.': '01', 'มกราคม': '01',
         'ก.พ.': '02', 'กุมภาพันธ์': '02',
@@ -714,7 +883,6 @@
         'ธ.ค.': '12', 'ธันวาคม': '12'
       };
 
-      // รองรับรูปแบบวันที่ไทย เช่น "27 มิ.ย. 2569" หรือ "27 มิถุนายน 2569"
       const thaiPattern = /(\d{1,2})\s+(ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+(\d{4})/;
       const thaiMatch = s.match(thaiPattern);
       if (thaiMatch) {
@@ -723,30 +891,25 @@
         let y = parseInt(thaiMatch[3], 10);
         const mm = thaiMonthMap[monthKey];
         if (mm) {
-          // ปี พ.ศ. (> 2400) → แปลงเป็น ค.ศ.
           if (y > 2400) y -= 543;
           return `${y}-${mm}-${String(dd).padStart(2, '0')}`;
         }
       }
 
-      // รูปแบบเดิม: DD/MM/YYYY หรือ DD-MM-YYYY หรือ DD.MM.YYYY
-      const m = s.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+      const m = s.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
       if (!m) return null;
       let [, dd, mm, yyyy] = m;
       let y = parseInt(yyyy, 10);
 
-      // ถ้าในสลิปมาเป็นปี 2 หลัก (เช่น 67 หรือ 24)
       if (yyyy.length === 2) {
         if (y >= 50) y += 2500;
         else y += 2000;
       }
 
-      // ถ้าปีมากกว่า 2400 (เช่น 2569 พ.ศ.) → แปลงเป็น ค.ศ.
       if (y > 2400) y -= 543;
 
       return `${y}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
     }
-
 
     document.getElementById('deposit-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -762,12 +925,10 @@
       if (!currentSlip) { toast('กรุณาแนบสลิปการโอนเงิน', 'error'); return; }
       if (!amount || amount <= 0) { toast('กรุณาระบุจำนวนเงินให้ถูกต้อง', 'error'); return; }
 
-      // ต้องชื่อตรงกัน หรือผู้ใช้ติ๊กยืนยันกรณีชื่อไม่ตรง/อ่านไม่ได้ ก่อนจึงจะบันทึกได้
       const sim = nameSimilarity(senderName, member);
       const nameOk = checkNameMatch();
       if (!nameOk) { toast('กรุณาตรวจสอบชื่อผู้โอน หรือติ๊กยืนยันก่อนบันทึก', 'error'); return; }
 
-      // ตรวจสอบชื่อผู้รับเพื่อแสดงสถานะ โดยกรณี OCR อ่านไม่พบ/ผิดพลาดยังบันทึกได้
       checkReceiverName();
       const nameMatchStatus = !senderName ? 'no_sender_name' : (sim >= 0.99 ? 'matched' : (sim >= 0.5 ? 'partial_override' : 'mismatch_override'));
 
@@ -798,8 +959,6 @@
         lucide.createIcons();
       }
     });
-
-
 
     function resetDepositForm() {
       document.getElementById('deposit-form').reset();
