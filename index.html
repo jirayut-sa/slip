@@ -181,14 +181,14 @@
             </div>
             <p id="deposit-cycle-label" class="text-sm text-blue-100">ยอดฝากเดือนนี้</p>
             <p id="val-month-deposit" class="text-2xl sm:text-4xl font-extrabold mt-1.5 tracking-tight text-white font-latin">
-              <span>0 บาท</span><span class="text-white/35 mx-1">/</span><span class="text-teal-200">7,800 บาท</span>
+              <span>0 บาท</span><span class="text-white/35 mx-1">/</span><span class="text-teal-200">7,500 บาท</span>
             </p>
             <div class="h-2 max-w-md rounded-full bg-white/10 overflow-hidden mt-5">
               <div id="cycle-progress-bar" class="h-full rounded-full bg-gradient-to-r from-cyan-300 to-teal-300 transition-[width] duration-700" style="width:0%"></div>
             </div>
             <div class="mt-4 flex flex-wrap items-center gap-2.5">
               <span id="deposit-cycle-hint" class="soft-chip bg-white/10 border border-white/10 text-white"><i data-lucide="users" class="w-3.5 h-3.5"></i>แตะเพื่อดูผู้ที่ยังไม่โอน</span>
-              <span id="cycle-remaining-chip" class="soft-chip bg-teal-300/15 text-teal-100">เหลืออีก 7,800 บาท</span>
+              <span id="cycle-remaining-chip" class="soft-chip bg-teal-300/15 text-teal-100">เหลืออีก 7,500 บาท</span>
             </div>
           </div>
           <div class="relative shrink-0 flex items-center justify-center">
@@ -454,7 +454,7 @@
           </div>
           <div class="rounded-2xl bg-blue-50 border border-blue-100 p-3.5">
             <p class="text-xs text-blue-700">เป้าหมาย</p>
-            <p class="text-lg font-extrabold text-blue-700 mt-1">7,800 บาท</p>
+            <p class="text-lg font-extrabold text-blue-700 mt-1">7,500 บาท</p>
           </div>
         </div>
         <div class="flex items-center justify-between gap-3 mb-3">
@@ -486,7 +486,7 @@
     let currentSlip = null;
     let currentOcrExtra = {};
     let currentUploadDate = '';
-    const MONTHLY_DEPOSIT_TARGET = 7800;
+    const MONTHLY_DEPOSIT_TARGET = 7500;
     let activeDepositCycle = null;
 
     // ---------------- Utilities ----------------
@@ -587,7 +587,7 @@
       return Number.isFinite(parsed) ? parsed : fallbackIndex;
     }
 
-    // แบ่งรายการฝากเป็นรอบต่อเนื่อง รอบเดิมจะไม่เปลี่ยนเดือนจนกว่ายอดครบ 7,800 บาท
+    // แบ่งรายการฝากเป็นรอบต่อเนื่อง รอบเดิมจะไม่เปลี่ยนเดือนจนกว่ายอดครบ 7,500 บาท
     function getActiveDepositCycle() {
       const deposits = state.transactions
         .map((transaction, index) => ({ transaction, index }))
@@ -827,7 +827,7 @@
 
       const remaining = Math.max(0, MONTHLY_DEPOSIT_TARGET - cycle.total);
       document.getElementById('cycle-modal-note').textContent = remaining > 0
-        ? `รอบ ${cycleMonthText} จะยังคงแสดงต่อไปจนกว่ายอดฝากจะครบ 7,800 บาท (เหลืออีก ${remaining.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท)`
+        ? `รอบ ${cycleMonthText} จะยังคงแสดงต่อไปจนกว่ายอดฝากจะครบ 7,500 บาท (เหลืออีก ${remaining.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท)`
         : `รอบ ${cycleMonthText} ครบเป้าหมายแล้ว ระบบจะเริ่มรอบเดือนใหม่โดยอัตโนมัติ`;
       lucide.createIcons();
     }
