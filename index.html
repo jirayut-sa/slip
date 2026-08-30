@@ -406,6 +406,27 @@
           </button>
         </div>
 
+        <div class="surface-card rounded-[1.5rem] p-5 sm:p-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="metric-icon w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 grid place-items-center shrink-0"><i data-lucide="calendar-range" class="w-5 h-5 text-white"></i></div>
+              <div class="min-w-0">
+                <h3 class="font-extrabold text-lg text-slate-900">จัดการรอบรายเดือน</h3>
+                <p class="text-xs text-slate-500 mt-0.5">รอบที่กำลังแสดง: <span id="admin-cycle-month" class="font-bold text-indigo-700">-</span></p>
+              </div>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2.5 shrink-0">
+              <button onclick="resetDepositCycleMonth()" type="button" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-bold shadow-sm">
+                <i data-lucide="calendar-clock" class="w-4 h-4"></i>กลับเดือนปัจจุบัน
+              </button>
+              <button onclick="advanceDepositCycle()" type="button" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:brightness-105 text-white text-sm font-bold shadow-lg shadow-indigo-200/60">
+                ข้ามไปเดือนถัดไป<i data-lucide="arrow-right" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">การข้ามเดือนจะไม่ลบหรือแก้ไขประวัติเดิม และจดจำรอบที่เลือกไว้ในอุปกรณ์นี้</p>
+        </div>
+
         <div class="grid lg:grid-cols-5 gap-5">
           <div class="surface-card rounded-[1.5rem] p-5 sm:p-6 lg:col-span-2">
             <div class="flex items-center gap-3 mb-5">
@@ -487,7 +508,9 @@
     let currentOcrExtra = {};
     let currentUploadDate = '';
     const MONTHLY_DEPOSIT_TARGET = 7500;
+    const DEPOSIT_CYCLE_STORAGE_KEY = 'section1.activeDepositMonth.v2';
     let activeDepositCycle = null;
+    const pendingDeletedTransactionIds = new Set();
 
     // ---------------- Utilities ----------------
     function toast(message, type = 'success') {
@@ -587,53 +610,100 @@
       return Number.isFinite(parsed) ? parsed : fallbackIndex;
     }
 
-    // แบ่งรายการฝากเป็นรอบต่อเนื่อง รอบเดิมจะไม่เปลี่ยนเดือนจนกว่ายอดครบ 7,500 บาท
+    function getSavedDepositMonthKey() {
+      try {
+        return normalizeMonthKey(localStorage.getItem(DEPOSIT_CYCLE_STORAGE_KEY));
+      } catch (error) {
+        return '';
+      }
+    }
+
+    function saveDepositMonthKey(monthKey) {
+      const normalized = normalizeMonthKey(monthKey);
+      if (!normalized) return false;
+      try {
+        localStorage.setItem(DEPOSIT_CYCLE_STORAGE_KEY, normalized);
+        return true;
+      } catch (error) {
+        toast('อุปกรณ์นี้ไม่อนุญาตให้จดจำรอบเดือน', 'error');
+        return false;
+      }
+    }
+
+    function getDepositTotalForMonth(monthKey) {
+      return state.transactions.reduce((total, transaction) => {
+        const amount = Number(transaction.amount) || 0;
+        const transactionMonth = normalizeMonthKey(transaction.date);
+        return amount > 0 && transactionMonth === monthKey ? total + amount : total;
+      }, 0);
+    }
+
+    function getFirstDepositMonthKey() {
+      const months = state.transactions
+        .filter(transaction => (Number(transaction.amount) || 0) > 0)
+        .map(transaction => normalizeMonthKey(transaction.date))
+        .filter(Boolean)
+        .sort();
+      return months[0] || getCurrentMonthKey();
+    }
+
+    // ยอดของแต่ละรอบยึดตามเดือนของวันที่รายการเท่านั้น จึงไม่ดึงเงินเดือนถัดไป
+    // มาชดเชยเมื่อมีการลบรายการจากเดือนก่อนหน้า
     function getActiveDepositCycle() {
-      const deposits = state.transactions
-        .map((transaction, index) => ({ transaction, index }))
-        .filter(item => (Number(item.transaction.amount) || 0) > 0)
-        .sort((a, b) => transactionTimeValue(a.transaction, a.index) - transactionTimeValue(b.transaction, b.index));
+      let monthKey = getSavedDepositMonthKey() || getFirstDepositMonthKey();
 
-      let cycle = null;
-      let lastCompletedMonth = '';
-
-      deposits.forEach(item => {
-        const transaction = item.transaction;
-        if (!cycle) {
-          cycle = {
-            monthKey: normalizeMonthKey(transaction.date) || getCurrentMonthKey(),
-            total: 0,
-            transactions: [],
-            paidMemberNames: new Set()
-          };
-        }
-
-        cycle.total += Number(transaction.amount) || 0;
-        cycle.transactions.push(transaction);
-        if (transaction.memberName && transaction.slipUrl) {
-          cycle.paidMemberNames.add(String(transaction.memberName).trim());
-        }
-
-        if (cycle.total >= MONTHLY_DEPOSIT_TARGET) {
-          lastCompletedMonth = cycle.monthKey;
-          cycle = null;
-        }
-      });
-
-      if (!cycle) {
-        const suggestedMonth = lastCompletedMonth ? nextMonthKey(lastCompletedMonth) : getCurrentMonthKey();
-        cycle = {
-          monthKey: suggestedMonth > getCurrentMonthKey() ? suggestedMonth : getCurrentMonthKey(),
-          total: 0,
-          transactions: [],
-          paidMemberNames: new Set()
-        };
+      // รอบที่ครบเป้าหมายจะขยับอัตโนมัติ แต่หยุดทันทีที่เจอเดือนที่ยังไม่ครบ
+      // เพื่อไม่ให้ข้ามเดือนว่างหรือเดือนที่ยอดขาดโดยไม่ตั้งใจ
+      for (let guard = 0; guard < 120; guard += 1) {
+        if (getDepositTotalForMonth(monthKey) < MONTHLY_DEPOSIT_TARGET) break;
+        monthKey = nextMonthKey(monthKey);
       }
 
-      cycle.missingMembers = state.members.filter(member => {
-        return !cycle.paidMemberNames.has(String(member.name || '').trim());
+      const transactions = state.transactions.filter(transaction => {
+        return (Number(transaction.amount) || 0) > 0 && normalizeMonthKey(transaction.date) === monthKey;
       });
-      return cycle;
+      const paidMemberNames = new Set();
+      transactions.forEach(transaction => {
+        if (transaction.memberName && transaction.slipUrl) {
+          paidMemberNames.add(String(transaction.memberName).trim());
+        }
+      });
+
+      return {
+        monthKey,
+        total: transactions.reduce((total, transaction) => total + (Number(transaction.amount) || 0), 0),
+        transactions,
+        paidMemberNames,
+        missingMembers: state.members.filter(member => !paidMemberNames.has(String(member.name || '').trim()))
+      };
+    }
+
+    function syncAdminCycleControls() {
+      const label = document.getElementById('admin-cycle-month');
+      if (!label) return;
+      const cycle = activeDepositCycle || getActiveDepositCycle();
+      label.textContent = formatThaiMonth(cycle.monthKey);
+    }
+
+    function advanceDepositCycle() {
+      const cycle = activeDepositCycle || getActiveDepositCycle();
+      const nextMonth = nextMonthKey(cycle.monthKey);
+      if (!confirm(`ยืนยันข้ามรอบ ${formatThaiMonth(cycle.monthKey)} ไปเป็น ${formatThaiMonth(nextMonth)} หรือไม่?\n\nประวัติและยอดของเดือนเดิมจะไม่ถูกลบ`)) return;
+      if (!saveDepositMonthKey(nextMonth)) return;
+      activeDepositCycle = null;
+      renderDashboard();
+      syncAdminCycleControls();
+      toast('เปลี่ยนรอบเป็น ' + formatThaiMonth(nextMonth) + ' แล้ว', 'success');
+    }
+
+    function resetDepositCycleMonth() {
+      const currentMonth = getCurrentMonthKey();
+      if (!confirm(`ยืนยันกลับมาแสดงรอบ ${formatThaiMonth(currentMonth)} หรือไม่?`)) return;
+      if (!saveDepositMonthKey(currentMonth)) return;
+      activeDepositCycle = null;
+      renderDashboard();
+      syncAdminCycleControls();
+      toast('กลับมาแสดงรอบเดือนปัจจุบันแล้ว', 'success');
     }
 
     function countUp(el, target) {
@@ -717,11 +787,14 @@
       try {
         const data = await apiCall('getData');
         state.members = data.members || [];
-        state.transactions = data.transactions || [];
+        state.transactions = (data.transactions || []).filter(transaction => {
+          return !pendingDeletedTransactionIds.has(String(transaction.id));
+        });
         renderDashboard();
         renderMemberSelect();
         renderMemberList();
         renderAdminTxnList();
+        syncAdminCycleControls();
       } catch (err) {
         toast(err.message, 'error');
       } finally {
@@ -1223,6 +1296,7 @@
         document.getElementById('admin-content').classList.remove('hidden');
         document.getElementById('passkey-error').classList.add('hidden');
         document.getElementById('input-passkey').value = '';
+        syncAdminCycleControls();
         toast('เข้าสู่ส่วนผู้ดูแลแล้ว', 'success');
       } else {
         document.getElementById('passkey-error').textContent = 'Passkey ไม่ถูกต้อง';
@@ -1311,6 +1385,11 @@
       if (!confirm('ยืนยันการลบรายการนี้หรือไม่? การลบไม่สามารถย้อนกลับได้')) return;
       try {
         await apiCall('deleteTransaction', { id });
+        pendingDeletedTransactionIds.add(String(id));
+        state.transactions = state.transactions.filter(transaction => String(transaction.id) !== String(id));
+        renderDashboard();
+        renderAdminTxnList();
+        syncAdminCycleControls();
         toast('ลบรายการแล้ว', 'success');
         await loadData();
       } catch (err) {
