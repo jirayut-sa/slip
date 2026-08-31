@@ -99,6 +99,10 @@
       .cycle-ring::before { width:98px; height:98px; }
       #deposit-cycle-modal { align-items:flex-end; padding:0; }
       #deposit-cycle-modal>div { border-radius:1.6rem 1.6rem 0 0; max-height:88vh; overflow-y:auto; }
+      #activities-modal { align-items:flex-end; padding:0; }
+      #activities-modal>div { border-radius:1.6rem 1.6rem 0 0; max-height:88vh; overflow-y:auto; }
+      #activity-detail-modal { align-items:flex-end; padding:0; }
+      #activity-detail-modal>div { border-radius:1.6rem 1.6rem 0 0; max-height:88vh; overflow-y:auto; }
     }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; animation-iteration-count:1!important; scroll-behavior:auto!important; transition-duration:.01ms!important; } }
   </style>
@@ -202,6 +206,17 @@
         </div>
       </button>
 
+      <button id="activities-card" type="button" onclick="openActivitiesModal()" class="surface-card card-hover w-full rounded-2xl p-4 sm:p-5 text-left flex items-center justify-between gap-4 mb-5 sm:mb-6">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="metric-icon w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500 to-fuchsia-600 grid place-items-center shrink-0"><i data-lucide="gift" class="w-5 h-5 text-white"></i></div>
+          <div class="min-w-0">
+            <p class="text-xs text-slate-500">กิจกรรมเก็บเงินพิเศษ</p>
+            <p id="activities-summary-text" class="text-base font-extrabold text-slate-900 mt-0.5 truncate">ยังไม่มีกิจกรรม</p>
+          </div>
+        </div>
+        <i data-lucide="chevron-right" class="w-5 h-5 text-slate-400 shrink-0"></i>
+      </button>
+
       <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-7">
         <div class="card-hover stat-card rounded-2xl p-4 sm:p-5">
           <div class="flex items-start justify-between gap-3">
@@ -278,6 +293,25 @@
           </div>
 
           <div class="mt-4">
+            <label class="block text-sm font-semibold mb-2 text-gray-800"><i data-lucide="target" class="w-4 h-4 inline -mt-1"></i> สำหรับ</label>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="flex items-center justify-center gap-2 border rounded-xl py-3 cursor-pointer text-sm font-semibold transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 has-[:checked]:text-blue-700 border-slate-200 bg-white text-slate-500">
+                <input type="radio" name="txn-scope" value="monthly" class="hidden" checked> <i data-lucide="calendar-days" class="w-4 h-4"></i> เก็บเงินรายเดือน
+              </label>
+              <label class="flex items-center justify-center gap-2 border rounded-xl py-3 cursor-pointer text-sm font-semibold transition has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50 has-[:checked]:text-purple-700 border-slate-200 bg-white text-slate-500">
+                <input type="radio" name="txn-scope" value="activity" class="hidden"> <i data-lucide="gift" class="w-4 h-4"></i> กิจกรรมเฉพาะกิจ
+              </label>
+            </div>
+          </div>
+
+          <div id="activity-select-wrap" class="hidden mt-4">
+            <label class="block text-sm font-semibold mb-2 text-gray-800" for="select-activity"><i data-lucide="gift" class="w-4 h-4 inline -mt-1"></i> เลือกกิจกรรม</label>
+            <select id="select-activity" class="field-modern w-full px-4 py-3 text-sm">
+              <option value="">-- เลือกกิจกรรม --</option>
+            </select>
+          </div>
+
+          <div id="txn-type-wrap" class="mt-4">
             <label class="block text-sm font-semibold mb-2 text-gray-800"><i data-lucide="receipt" class="w-4 h-4 inline -mt-1"></i> ประเภทรายการ</label>
             <div class="grid grid-cols-2 gap-3">
               <label class="flex items-center justify-center gap-2 border rounded-xl py-3 cursor-pointer text-sm font-semibold transition has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50 has-[:checked]:text-teal-700 border-slate-200 bg-white text-slate-500">
@@ -416,15 +450,31 @@
               </div>
             </div>
             <div class="flex flex-col sm:flex-row gap-2.5 shrink-0">
-              <button onclick="resetDepositCycleMonth()" type="button" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-bold shadow-sm">
-                <i data-lucide="calendar-clock" class="w-4 h-4"></i>กลับเดือนปัจจุบัน
-              </button>
-              <button onclick="advanceDepositCycle()" type="button" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:brightness-105 text-white text-sm font-bold shadow-lg shadow-indigo-200/60">
-                ข้ามไปเดือนถัดไป<i data-lucide="arrow-right" class="w-4 h-4"></i>
+              <button onclick="skipCurrentMonth()" type="button" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-orange-500 hover:brightness-105 text-white text-sm font-bold shadow-lg shadow-rose-200/60">
+                <i data-lucide="skip-forward" class="w-4 h-4"></i>ข้ามเดือนนี้ (ไม่เก็บเงิน)
               </button>
             </div>
           </div>
-          <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">การข้ามเดือนจะไม่ลบหรือแก้ไขประวัติเดิม และจดจำรอบที่เลือกไว้ในอุปกรณ์นี้</p>
+          <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">การข้ามเดือนจะบันทึกลง Google Sheet และมีผลกับทุกอุปกรณ์ทันทีที่รีเฟรชข้อมูล ไม่ลบหรือแก้ไขประวัติเดิม</p>
+          <div class="mt-4 pt-4 border-t border-slate-100">
+            <p class="text-xs font-bold text-slate-500 mb-2">ประวัติเดือนที่ถูกข้าม</p>
+            <div id="skipped-months-list" class="space-y-2"></div>
+          </div>
+        </div>
+
+        <div class="surface-card rounded-[1.5rem] p-5 sm:p-6">
+          <div class="flex items-center gap-3 mb-5">
+            <div class="metric-icon w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500 to-fuchsia-600 grid place-items-center"><i data-lucide="gift" class="w-5 h-5 text-white"></i></div>
+            <div><h3 class="font-extrabold text-lg text-slate-900">จัดการกิจกรรมเก็บเงินพิเศษ</h3><p class="text-xs text-slate-500">สร้างกิจกรรมใหม่ และติดตามยอดของแต่ละกิจกรรม</p></div>
+          </div>
+          <form id="activity-form" class="grid grid-cols-1 sm:grid-cols-[1fr_140px_auto] gap-2.5 mb-5">
+            <input id="input-activity-name" type="text" placeholder="ชื่อกิจกรรม เช่น ทัศนศึกษา" class="field-modern px-4 py-3 text-sm" required>
+            <input id="input-activity-target" type="number" min="0" step="1" placeholder="เป้าหมาย (ถ้ามี)" class="field-modern px-4 py-3 text-sm">
+            <button type="submit" class="btn-primary px-4 sm:px-5 py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2">
+              <i data-lucide="plus" class="w-4 h-4"></i><span class="hidden sm:inline">สร้าง</span>
+            </button>
+          </form>
+          <div id="admin-activity-list" class="space-y-2"></div>
         </div>
 
         <div class="grid lg:grid-cols-5 gap-5">
@@ -488,6 +538,39 @@
     </div>
   </div>
 
+  <!-- รวมกิจกรรมเก็บเงินพิเศษ -->
+  <div id="activities-modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm" role="dialog" aria-modal="true" onclick="handleModalBackdrop(event,'activities-modal')">
+    <div class="w-full max-w-lg bg-white rounded-[1.75rem] shadow-2xl border border-white/70 overflow-hidden pop-in">
+      <div class="gradient-header px-5 py-5 flex items-center justify-between gap-3">
+        <div class="min-w-0"><p class="text-[10px] uppercase tracking-[.16em] font-bold text-teal-200">Activities</p><h2 class="text-lg font-extrabold text-white truncate mt-0.5">กิจกรรมเก็บเงินพิเศษ</h2></div>
+        <button type="button" onclick="closeModal('activities-modal')" class="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center" aria-label="ปิดหน้าต่าง"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="p-5 sm:p-6 bg-gradient-to-b from-white to-slate-50/70">
+        <div id="activities-modal-list" class="space-y-2.5 max-h-96 overflow-y-auto pr-1"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- รายละเอียดกิจกรรมเดี่ยว -->
+  <div id="activity-detail-modal" class="hidden fixed inset-0 z-[55] items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm" role="dialog" aria-modal="true" onclick="handleModalBackdrop(event,'activity-detail-modal')">
+    <div class="w-full max-w-lg bg-white rounded-[1.75rem] shadow-2xl border border-white/70 overflow-hidden pop-in">
+      <div class="gradient-header px-5 py-5 flex items-center justify-between gap-3">
+        <div class="min-w-0"><p class="text-[10px] uppercase tracking-[.16em] font-bold text-teal-200">Activity Detail</p><h2 id="activity-detail-title" class="text-lg font-extrabold text-white truncate mt-0.5">-</h2></div>
+        <button type="button" onclick="closeModal('activity-detail-modal')" class="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center" aria-label="ปิดหน้าต่าง"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="p-5 sm:p-6 bg-gradient-to-b from-white to-slate-50/70">
+        <div class="grid grid-cols-2 gap-3 mb-5">
+          <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-3.5"><p class="text-xs text-emerald-700">ยอดที่เก็บได้</p><p id="activity-detail-total" class="text-lg font-extrabold text-emerald-700 mt-1">0 บาท</p></div>
+          <div class="rounded-2xl bg-purple-50 border border-purple-100 p-3.5"><p class="text-xs text-purple-700">เป้าหมาย</p><p id="activity-detail-target" class="text-lg font-extrabold text-purple-700 mt-1">-</p></div>
+        </div>
+        <h3 class="font-bold text-gray-900 flex items-center gap-2 mb-3"><i data-lucide="user-check" class="w-5 h-5 text-emerald-500"></i>โอนแล้ว <span id="activity-paid-count" class="text-xs font-bold rounded-full bg-emerald-100 text-emerald-600 px-2.5 py-1">0 คน</span></h3>
+        <div id="activity-paid-list" class="space-y-2 max-h-40 overflow-y-auto pr-1 mb-4"></div>
+        <h3 class="font-bold text-gray-900 flex items-center gap-2 mb-3"><i data-lucide="user-x" class="w-5 h-5 text-red-500"></i>ยังไม่โอน <span id="activity-unpaid-count" class="text-xs font-bold rounded-full bg-red-100 text-red-600 px-2.5 py-1">0 คน</span></h3>
+        <div id="activity-unpaid-list" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+      </div>
+    </div>
+  </div>
+
   <footer class="text-center py-6 text-xs text-gray-400 border-t border-gray-100 mt-8">
     <p>ระบบบันทึกการเก็บเงิน Section 1 • นักศึกษาหลักสูตรศึกษาศาสตรมหาบัณฑิต สาขาวิชาการบริหารการศึกษา มหาวิทยาลัยหาดใหญ่</p>
   </footer>
@@ -502,13 +585,12 @@
       ADMIN_PASSKEY: '6919050' // รหัสผ่านสำหรับเข้าหน้า Admin (แนะนำให้เปลี่ยน)
     };
 
-    let state = { members: [], transactions: [] };
+    let state = { members: [], transactions: [], skippedMonths: [], activities: [] };
     let adminUnlocked = false;
     let currentSlip = null;
     let currentOcrExtra = {};
     let currentUploadDate = '';
     const MONTHLY_DEPOSIT_TARGET = 7500;
-    const DEPOSIT_CYCLE_STORAGE_KEY = 'section1.activeDepositMonth.v2';
     let activeDepositCycle = null;
     const pendingDeletedTransactionIds = new Set();
 
@@ -610,57 +692,41 @@
       return Number.isFinite(parsed) ? parsed : fallbackIndex;
     }
 
-    function getSavedDepositMonthKey() {
-      try {
-        return normalizeMonthKey(localStorage.getItem(DEPOSIT_CYCLE_STORAGE_KEY));
-      } catch (error) {
-        return '';
-      }
-    }
-
-    function saveDepositMonthKey(monthKey) {
-      const normalized = normalizeMonthKey(monthKey);
-      if (!normalized) return false;
-      try {
-        localStorage.setItem(DEPOSIT_CYCLE_STORAGE_KEY, normalized);
-        return true;
-      } catch (error) {
-        toast('อุปกรณ์นี้ไม่อนุญาตให้จดจำรอบเดือน', 'error');
-        return false;
-      }
+    function isMonthSkipped(monthKey) {
+      return state.skippedMonths.some(s => normalizeMonthKey(s.monthKey) === monthKey);
     }
 
     function getDepositTotalForMonth(monthKey) {
       return state.transactions.reduce((total, transaction) => {
         const amount = Number(transaction.amount) || 0;
         const transactionMonth = normalizeMonthKey(transaction.date);
-        return amount > 0 && transactionMonth === monthKey ? total + amount : total;
+        return amount > 0 && !transaction.activityId && transactionMonth === monthKey ? total + amount : total;
       }, 0);
     }
 
     function getFirstDepositMonthKey() {
       const months = state.transactions
-        .filter(transaction => (Number(transaction.amount) || 0) > 0)
+        .filter(transaction => (Number(transaction.amount) || 0) > 0 && !transaction.activityId)
         .map(transaction => normalizeMonthKey(transaction.date))
         .filter(Boolean)
         .sort();
       return months[0] || getCurrentMonthKey();
     }
 
-    // ยอดของแต่ละรอบยึดตามเดือนของวันที่รายการเท่านั้น จึงไม่ดึงเงินเดือนถัดไป
-    // มาชดเชยเมื่อมีการลบรายการจากเดือนก่อนหน้า
+    // ยอดของแต่ละรอบยึดตามเดือนของวันที่รายการเท่านั้น เดือนที่ถูกข้ามจะถูกข้ามอัตโนมัติ
     function getActiveDepositCycle() {
-      let monthKey = getSavedDepositMonthKey() || getFirstDepositMonthKey();
+      let monthKey = getFirstDepositMonthKey();
 
-      // รอบที่ครบเป้าหมายจะขยับอัตโนมัติ แต่หยุดทันทีที่เจอเดือนที่ยังไม่ครบ
-      // เพื่อไม่ให้ข้ามเดือนว่างหรือเดือนที่ยอดขาดโดยไม่ตั้งใจ
-      for (let guard = 0; guard < 120; guard += 1) {
-        if (getDepositTotalForMonth(monthKey) < MONTHLY_DEPOSIT_TARGET) break;
-        monthKey = nextMonthKey(monthKey);
+      for (let guard = 0; guard < 240; guard += 1) {
+        if (isMonthSkipped(monthKey) || getDepositTotalForMonth(monthKey) >= MONTHLY_DEPOSIT_TARGET) {
+          monthKey = nextMonthKey(monthKey);
+          continue;
+        }
+        break;
       }
 
       const transactions = state.transactions.filter(transaction => {
-        return (Number(transaction.amount) || 0) > 0 && normalizeMonthKey(transaction.date) === monthKey;
+        return (Number(transaction.amount) || 0) > 0 && !transaction.activityId && normalizeMonthKey(transaction.date) === monthKey;
       });
       const paidMemberNames = new Set();
       transactions.forEach(transaction => {
@@ -680,30 +746,47 @@
 
     function syncAdminCycleControls() {
       const label = document.getElementById('admin-cycle-month');
-      if (!label) return;
-      const cycle = activeDepositCycle || getActiveDepositCycle();
-      label.textContent = formatThaiMonth(cycle.monthKey);
+      if (label) label.textContent = formatThaiMonth((activeDepositCycle || getActiveDepositCycle()).monthKey);
+      renderSkippedMonthsAdminList();
+      renderAdminActivityList();
     }
 
-    function advanceDepositCycle() {
+    async function skipCurrentMonth() {
       const cycle = activeDepositCycle || getActiveDepositCycle();
-      const nextMonth = nextMonthKey(cycle.monthKey);
-      if (!confirm(`ยืนยันข้ามรอบ ${formatThaiMonth(cycle.monthKey)} ไปเป็น ${formatThaiMonth(nextMonth)} หรือไม่?\n\nประวัติและยอดของเดือนเดิมจะไม่ถูกลบ`)) return;
-      if (!saveDepositMonthKey(nextMonth)) return;
-      activeDepositCycle = null;
-      renderDashboard();
-      syncAdminCycleControls();
-      toast('เปลี่ยนรอบเป็น ' + formatThaiMonth(nextMonth) + ' แล้ว', 'success');
+      if (!confirm(`ยืนยันข้ามเดือน ${formatThaiMonth(cycle.monthKey)} หรือไม่?\n\nระบบจะบันทึกว่าเดือนนี้ไม่เก็บเงิน (0 บาท) ลง Google Sheet และทุกเครื่องจะเห็นตรงกัน`)) return;
+      try {
+        await apiCall('skipMonth', { monthKey: cycle.monthKey });
+        toast('ข้ามเดือน ' + formatThaiMonth(cycle.monthKey) + ' แล้ว', 'success');
+        await loadData(true);
+      } catch (err) {
+        toast(err.message, 'error');
+      }
     }
 
-    function resetDepositCycleMonth() {
-      const currentMonth = getCurrentMonthKey();
-      if (!confirm(`ยืนยันกลับมาแสดงรอบ ${formatThaiMonth(currentMonth)} หรือไม่?`)) return;
-      if (!saveDepositMonthKey(currentMonth)) return;
-      activeDepositCycle = null;
-      renderDashboard();
-      syncAdminCycleControls();
-      toast('กลับมาแสดงรอบเดือนปัจจุบันแล้ว', 'success');
+    async function unskipMonth(monthKey) {
+      if (!confirm(`ยืนยันยกเลิกการข้ามเดือน ${formatThaiMonth(monthKey)} หรือไม่?`)) return;
+      try {
+        await apiCall('unskipMonth', { monthKey });
+        toast('ยกเลิกการข้ามเดือนแล้ว', 'success');
+        await loadData(true);
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    }
+
+    function renderSkippedMonthsAdminList() {
+      const container = document.getElementById('skipped-months-list');
+      if (!container) return;
+      if (state.skippedMonths.length === 0) {
+        container.innerHTML = '<p class="text-gray-400 text-xs text-center py-3">ยังไม่มีเดือนที่ถูกข้าม</p>';
+        return;
+      }
+      const sorted = [...state.skippedMonths].sort((a, b) => String(b.monthKey).localeCompare(String(a.monthKey)));
+      container.innerHTML = sorted.map(s => `
+        <div class="flex items-center justify-between gap-2 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
+          <span class="text-sm font-bold text-slate-700">${escapeHtml(formatThaiMonth(s.monthKey))}</span>
+          <button onclick="unskipMonth('${s.monthKey}')" class="text-xs font-bold text-indigo-600 hover:underline">ยกเลิก</button>
+        </div>`).join('');
     }
 
     function countUp(el, target) {
@@ -790,16 +873,169 @@
         state.transactions = (data.transactions || []).filter(transaction => {
           return !pendingDeletedTransactionIds.has(String(transaction.id));
         });
+        state.skippedMonths = data.skippedMonths || [];
+        state.activities = data.activities || [];
         renderDashboard();
         renderMemberSelect();
         renderMemberList();
         renderAdminTxnList();
+        renderActivitySelect();
+        renderActivitiesSummaryCard();
         syncAdminCycleControls();
       } catch (err) {
         toast(err.message, 'error');
       } finally {
         if (showLoader) hideAppLoading();
       }
+    }
+
+    // ---------------- Activities ----------------
+    function getActivityName(activityId) {
+      const activity = state.activities.find(a => String(a.id) === String(activityId));
+      return activity ? activity.name : '';
+    }
+
+    function getActivityStats(activityId) {
+      const txns = state.transactions.filter(t => String(t.activityId || '') === String(activityId) && (Number(t.amount) || 0) > 0);
+      const total = txns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+      const paidNames = new Set(txns.filter(t => t.memberName).map(t => String(t.memberName).trim()));
+      return {
+        total,
+        paidMembers: state.members.filter(m => paidNames.has(String(m.name || '').trim())),
+        unpaidMembers: state.members.filter(m => !paidNames.has(String(m.name || '').trim()))
+      };
+    }
+
+    function renderActivitiesSummaryCard() {
+      const el = document.getElementById('activities-summary-text');
+      if (!el) return;
+      const activeActivities = state.activities.filter(a => a.status !== 'closed');
+      if (activeActivities.length === 0) { el.textContent = 'ยังไม่มีกิจกรรม'; return; }
+      const totalAll = activeActivities.reduce((sum, a) => sum + getActivityStats(a.id).total, 0);
+      el.textContent = activeActivities.length + ' กิจกรรม • รวม ' + totalAll.toLocaleString('th-TH') + ' บาท';
+    }
+
+    function openModal(id) {
+      const modal = document.getElementById(id);
+      modal.classList.remove('hidden'); modal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeModal(id) {
+      const modal = document.getElementById(id);
+      modal.classList.add('hidden'); modal.classList.remove('flex');
+      document.body.style.overflow = '';
+    }
+    function handleModalBackdrop(event, id) {
+      if (event.target === event.currentTarget) closeModal(id);
+    }
+
+    function openActivitiesModal() {
+      const list = document.getElementById('activities-modal-list');
+      const activeActivities = state.activities.filter(a => a.status !== 'closed');
+      list.innerHTML = activeActivities.length === 0
+        ? '<div class="text-center py-8"><p class="text-slate-500 text-sm font-semibold">ยังไม่มีกิจกรรมเก็บเงิน</p></div>'
+        : activeActivities.map(a => {
+            const stats = getActivityStats(a.id);
+            const targetText = a.targetAmount > 0 ? ' / ' + a.targetAmount.toLocaleString('th-TH') + ' บาท' : '';
+            return `<button onclick="openActivityDetail('${a.id}')" class="w-full text-left flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 hover:border-purple-300 px-4 py-3 shadow-sm transition">
+              <div class="min-w-0">
+                <p class="text-sm font-bold text-slate-800 truncate">${escapeHtml(a.name)}</p>
+                <p class="text-xs text-slate-400 mt-0.5">${stats.paidMembers.length} คนโอนแล้ว จากทั้งหมด ${state.members.length} คน</p>
+              </div>
+              <div class="text-right shrink-0">
+                <p class="text-sm font-extrabold text-purple-600">${stats.total.toLocaleString('th-TH')} บาท${targetText}</p>
+              </div>
+            </button>`;
+          }).join('');
+      lucide.createIcons();
+      openModal('activities-modal');
+    }
+
+    function openActivityDetail(activityId) {
+      const activity = state.activities.find(a => String(a.id) === String(activityId));
+      if (!activity) return;
+      const stats = getActivityStats(activityId);
+      document.getElementById('activity-detail-title').textContent = activity.name;
+      document.getElementById('activity-detail-total').textContent = stats.total.toLocaleString('th-TH') + ' บาท';
+      document.getElementById('activity-detail-target').textContent = activity.targetAmount > 0 ? activity.targetAmount.toLocaleString('th-TH') + ' บาท' : 'ไม่ระบุ';
+      document.getElementById('activity-paid-count').textContent = stats.paidMembers.length + ' คน';
+      document.getElementById('activity-unpaid-count').textContent = stats.unpaidMembers.length + ' คน';
+
+      document.getElementById('activity-paid-list').innerHTML = stats.paidMembers.length === 0
+        ? '<p class="text-slate-400 text-xs text-center py-3">ยังไม่มีใครโอน</p>'
+        : stats.paidMembers.map(m => `<div class="flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2"><i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 shrink-0"></i><span class="text-sm font-bold text-slate-800 truncate">${escapeHtml(m.name)}</span></div>`).join('');
+
+      document.getElementById('activity-unpaid-list').innerHTML = stats.unpaidMembers.length === 0
+        ? '<div class="rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-bold p-3 text-center">ครบทุกคนแล้ว 🎉</div>'
+        : stats.unpaidMembers.map(m => `<div class="flex items-center gap-3 rounded-xl bg-rose-50 border border-rose-100 px-3 py-2"><i data-lucide="circle-x" class="w-4 h-4 text-rose-500 shrink-0"></i><span class="text-sm font-bold text-slate-800 truncate">${escapeHtml(m.name)}</span></div>`).join('');
+
+      lucide.createIcons();
+      openModal('activity-detail-modal');
+    }
+
+    function renderActivitySelect() {
+      const sel = document.getElementById('select-activity');
+      if (!sel) return;
+      const val = sel.value;
+      sel.innerHTML = '<option value="">-- เลือกกิจกรรม --</option>' +
+        state.activities.filter(a => a.status !== 'closed').map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+      sel.value = val;
+    }
+
+    document.querySelectorAll('input[name="txn-scope"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        const isActivity = document.querySelector('input[name="txn-scope"]:checked').value === 'activity';
+        document.getElementById('activity-select-wrap').classList.toggle('hidden', !isActivity);
+        document.getElementById('txn-type-wrap').classList.toggle('hidden', isActivity);
+        if (isActivity) document.querySelector('input[name="txn-type"][value="deposit"]').checked = true;
+      });
+    });
+
+    document.getElementById('activity-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('input-activity-name').value.trim();
+      const targetAmount = Number(document.getElementById('input-activity-target').value) || 0;
+      if (!name) return;
+      try {
+        await apiCall('addActivity', { name, targetAmount });
+        document.getElementById('input-activity-name').value = '';
+        document.getElementById('input-activity-target').value = '';
+        toast('สร้างกิจกรรมสำเร็จ', 'success');
+        await loadData();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+
+    async function deleteActivity(id) {
+      if (!confirm('ยืนยันการลบกิจกรรมนี้หรือไม่?')) return;
+      try {
+        await apiCall('deleteActivity', { id });
+        toast('ลบกิจกรรมแล้ว', 'success');
+        await loadData();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    }
+
+    function renderAdminActivityList() {
+      const container = document.getElementById('admin-activity-list');
+      if (!container) return;
+      if (state.activities.length === 0) {
+        container.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">ยังไม่มีกิจกรรม</p>';
+        return;
+      }
+      container.innerHTML = state.activities.map(a => {
+        const stats = getActivityStats(a.id);
+        return `<div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+          <button onclick="openActivityDetail('${a.id}')" class="flex items-center gap-3 min-w-0 text-left">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center shadow-sm shrink-0"><i data-lucide="gift" class="w-4 h-4 text-white"></i></div>
+            <div class="min-w-0"><p class="text-sm font-bold text-slate-800 truncate">${escapeHtml(a.name)}</p><p class="text-xs text-slate-400">${stats.total.toLocaleString('th-TH')} บาท • ${stats.paidMembers.length}/${state.members.length} คน</p></div>
+          </button>
+          <button onclick="deleteActivity('${a.id}')" class="w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 grid place-items-center transition shrink-0" aria-label="ลบกิจกรรม"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+        </div>`;
+      }).join('');
+      lucide.createIcons();
     }
 
     // ---------------- Dashboard ----------------
@@ -847,6 +1083,7 @@
       }
 
       countUp(document.getElementById('val-month-expense'), monthExpense);
+      renderActivitiesSummaryCard();
 
       const list = document.getElementById('history-list');
       if (txns.length === 0) {
@@ -858,13 +1095,17 @@
       list.innerHTML = sorted.slice(0, 30).map(t => {
         const amt = Number(t.amount) || 0;
         const isDeposit = amt > 0;
+        const activityName = t.activityId ? getActivityName(t.activityId) : '';
+        const typeChip = activityName
+          ? `<span class="hidden sm:inline-flex soft-chip py-0.5 px-2 bg-purple-50 text-purple-700">${escapeHtml(activityName)}</span>`
+          : `<span class="hidden sm:inline-flex soft-chip py-0.5 px-2 ${isDeposit ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}">${isDeposit ? 'ฝากเงิน' : 'เบิกจ่าย'}</span>`;
         return `<div class="transaction-row flex items-center justify-between gap-3 py-3.5 px-1 sm:px-2">
           <div class="flex items-center gap-3 min-w-0">
             <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl ${isDeposit ? 'bg-emerald-50' : 'bg-red-50'} flex items-center justify-center shrink-0 border ${isDeposit ? 'border-emerald-100' : 'border-red-100'}">
               <i data-lucide="${isDeposit ? 'arrow-down-left' : 'arrow-up-right'}" class="w-4 h-4 sm:w-5 sm:h-5 ${isDeposit ? 'text-emerald-600' : 'text-red-500'}"></i>
             </div>
             <div class="min-w-0">
-              <div class="flex items-center gap-2"><p class="text-sm font-bold text-slate-800 truncate">${escapeHtml(t.memberName || '')}</p><span class="hidden sm:inline-flex soft-chip py-0.5 px-2 ${isDeposit ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}">${isDeposit ? 'ฝากเงิน' : 'เบิกจ่าย'}</span></div>
+              <div class="flex items-center gap-2"><p class="text-sm font-bold text-slate-800 truncate">${escapeHtml(t.memberName || '')}</p>${typeChip}</div>
               <p class="text-xs text-slate-400 truncate mt-0.5">${escapeHtml(t.note || '')}${t.note ? ' • ' : ''}${String(t.date || '').substring(0, 10)}</p>
             </div>
           </div>
@@ -927,8 +1168,10 @@
     }
 
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && !document.getElementById('deposit-cycle-modal').classList.contains('hidden')) {
-        closeDepositCycleModal();
+      if (event.key === 'Escape') {
+        if (!document.getElementById('deposit-cycle-modal').classList.contains('hidden')) closeDepositCycleModal();
+        if (!document.getElementById('activities-modal').classList.contains('hidden')) closeModal('activities-modal');
+        if (!document.getElementById('activity-detail-modal').classList.contains('hidden')) closeModal('activity-detail-modal');
       }
     });
 
@@ -1216,7 +1459,9 @@
     document.getElementById('deposit-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const member = document.getElementById('select-member').value;
-      const type = document.querySelector('input[name="txn-type"]:checked').value;
+      const scope = document.querySelector('input[name="txn-scope"]:checked').value;
+      const activityId = scope === 'activity' ? document.getElementById('select-activity').value : '';
+      const type = scope === 'activity' ? 'deposit' : document.querySelector('input[name="txn-type"]:checked').value;
       const amount = Number(document.getElementById('ocr-amount').value);
       const date = currentUploadDate || getLocalToday();
       document.getElementById('ocr-date').value = date;
@@ -1224,6 +1469,7 @@
       const note = document.getElementById('input-note').value;
 
       if (!member) { toast('กรุณาเลือกชื่อสมาชิก', 'error'); return; }
+      if (scope === 'activity' && !activityId) { toast('กรุณาเลือกกิจกรรม', 'error'); return; }
       if (!currentSlip) { toast('กรุณาแนบสลิปการโอนเงิน', 'error'); return; }
       if (!amount || amount <= 0) { toast('กรุณาระบุจำนวนเงินให้ถูกต้อง', 'error'); return; }
 
@@ -1246,6 +1492,7 @@
           ocrBankApp: currentOcrExtra.bankApp || '',
           ocrReferenceNo: currentOcrExtra.referenceNo || '',
           nameMatchStatus,
+          activityId,
           imageBase64: currentSlip.base64, mimeType: currentSlip.mimeType
         });
         showDepositMsg('บันทึกรายการสำเร็จ!', false);
@@ -1276,6 +1523,9 @@
       document.getElementById('name-mismatch-override-wrap').classList.add('hidden');
       document.getElementById('name-mismatch-override').checked = false;
       document.getElementById('btn-submit').disabled = true;
+      document.querySelector('input[name="txn-scope"][value="monthly"]').checked = true;
+      document.getElementById('activity-select-wrap').classList.add('hidden');
+      document.getElementById('txn-type-wrap').classList.remove('hidden');
     }
 
     function showDepositMsg(text, isError) {
@@ -1339,11 +1589,12 @@
       container.innerHTML = sorted.map(t => {
         const amt = Number(t.amount) || 0;
         const isDeposit = amt > 0;
+        const activityName = t.activityId ? getActivityName(t.activityId) : '';
         return `<div class="transaction-row flex items-center justify-between gap-2 py-3 px-1 sm:px-2">
           <div class="min-w-0 flex items-center gap-2">
             <div class="w-9 h-9 rounded-xl ${isDeposit ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'} grid place-items-center shrink-0"><i data-lucide="${isDeposit ? 'arrow-down-left' : 'arrow-up-right'}" class="w-4 h-4"></i></div>
             <div class="min-w-0">
-              <p class="text-sm font-bold text-slate-800 truncate">${escapeHtml(t.memberName || '')} <span class="${isDeposit ? 'text-emerald-600' : 'text-red-500'} font-extrabold">${isDeposit ? '+' : '-'}${fmtCurrency(Math.abs(amt))}</span></p>
+              <p class="text-sm font-bold text-slate-800 truncate">${escapeHtml(t.memberName || '')} <span class="${isDeposit ? 'text-emerald-600' : 'text-red-500'} font-extrabold">${isDeposit ? '+' : '-'}${fmtCurrency(Math.abs(amt))}</span>${activityName ? ` <span class="text-[11px] font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">${escapeHtml(activityName)}</span>` : ''}</p>
               <p class="text-xs text-slate-400 truncate mt-0.5">${String(t.date || '').substring(0, 10)} ${t.note ? '• ' + escapeHtml(t.note) : ''}</p>
             </div>
           </div>
