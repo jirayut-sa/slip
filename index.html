@@ -286,6 +286,17 @@
           <p class="text-sm text-slate-500 mt-1.5">ระบบจะอ่านสลิปอัตโนมัติ คุณตรวจสอบและยืนยันก่อนบันทึกทุกครั้ง</p>
         </div>
 
+        <div id="payment-account-card" class="surface-card rounded-[1.5rem] p-5 sm:p-6 mb-5 border-blue-100">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="metric-icon w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 grid place-items-center shrink-0"><i data-lucide="landmark" class="w-6 h-6 text-white"></i></div>
+              <div class="min-w-0"><p class="text-xs text-slate-500">บัญชีสำหรับชำระเงิน</p><p id="payment-bank-name" class="font-bold text-slate-900">ธนาคารกรุงไทย</p><p id="payment-account-name" class="text-sm text-slate-600">นางสุวดี หีมปอง</p></div>
+            </div>
+            <div class="flex items-center gap-2"><span id="payment-account-number" class="font-latin text-xl font-extrabold text-blue-700 tracking-wider">9020878972</span><button type="button" onclick="copyBankAccount()" class="px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 flex items-center gap-1"><i data-lucide="copy" class="w-4 h-4"></i>คัดลอก</button></div>
+          </div>
+          <p id="payment-link-context" class="hidden mt-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm font-semibold p-3"></p>
+        </div>
+
         <div class="surface-card rounded-[1.6rem] p-4 sm:p-7">
         <form id="deposit-form" class="space-y-5">
           <section class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
@@ -469,7 +480,8 @@
             <div class="flex items-center gap-3 mb-5"><div class="metric-icon w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 grid place-items-center"><i data-lucide="calendar-sync" class="w-5 h-5 text-white"></i></div><div><h3 class="font-extrabold text-lg text-slate-900">ตั้งเก็บเงินรายเดือน</h3><p class="text-xs text-slate-500">สร้างบิลใหม่ให้อัตโนมัติทุกเดือน</p></div></div>
             <form id="monthly-plan-form" class="space-y-3">
               <input id="plan-title" class="field-modern w-full px-4 py-3 text-sm" placeholder="ชื่อรายการ เช่น เงินกองกลาง" required>
-              <div class="grid grid-cols-3 gap-2"><input id="plan-amount" type="number" min="0.01" step="0.01" class="field-modern px-3 py-3 text-sm" placeholder="บาท/คน" required><input id="plan-billing-day" type="number" min="1" max="28" value="1" class="field-modern px-3 py-3 text-sm" title="วันที่สร้างบิล"><input id="plan-due-day" type="number" min="1" max="28" value="25" class="field-modern px-3 py-3 text-sm" title="วันครบกำหนด"></div>
+              <div class="grid grid-cols-3 gap-2"><input id="plan-amount" type="number" min="0.01" step="0.01" class="field-modern px-3 py-3 text-sm" placeholder="บาท/คน" required><input id="plan-billing-day" type="number" value="23" readonly class="field-modern px-3 py-3 text-sm bg-slate-50" title="เริ่มแจ้งวันที่ 23"><input id="plan-due-day" type="number" min="23" max="28" value="28" class="field-modern px-3 py-3 text-sm" title="วันครบกำหนด 23–28"></div>
+              <p class="text-[11px] text-slate-500">ระบบแจ้งผู้ค้างชำระวันละครั้ง เวลาใกล้เคียง 12:00 ระหว่างวันที่ 23–28</p>
               <button class="btn-primary w-full py-3 rounded-xl text-sm font-bold text-white">เปิดแผนรายเดือน</button>
             </form>
             <div id="monthly-plan-list" class="space-y-2 mt-4"></div>
@@ -631,7 +643,10 @@
     const CONFIG = {
       API_URL: 'https://script.google.com/macros/s/AKfycbyx6FHcm9gs3TeEopijpRug8z8sXpo9iLm6v3qavCj0-2W8zwA6keSWgAc6qiPj7mVzXw/exec', // วาง Web App URL จาก Apps Script
       API_TOKEN: 'q4pIc1ZpvJnbjNZexdnv5EQ9c4DMyF1L', // ต้องตรงกับ API_TOKEN ใน Code.gs
-      ADMIN_PASSKEY: '6919050' // รหัสผ่านสำหรับเข้าหน้า Admin (แนะนำให้เปลี่ยน)
+      ADMIN_PASSKEY: '6919050', // รหัสผ่านสำหรับเข้าหน้า Admin (แนะนำให้เปลี่ยน)
+      BANK_NAME: 'ธนาคารกรุงไทย',
+      BANK_ACCOUNT_NO: '9020878972',
+      BANK_ACCOUNT_NAME: 'นางสุวดี หีมปอง'
     };
 
     let state = { members: [], transactions: [], skippedMonths: [], activities: [], bills: [], billMembers: [], monthlyPlans: [], withdrawals: [], financeSummary: {} };
@@ -642,6 +657,7 @@
     const MONTHLY_DEPOSIT_TARGET = 7500;
     let activeDepositCycle = null;
     const pendingDeletedTransactionIds = new Set();
+    let paymentParamsApplied = false;
 
     // ---------------- Utilities ----------------
     function toast(message, type = 'success') {
@@ -701,6 +717,38 @@
     }
 
     function fmtCurrency(n) { return '฿' + (Number(n) || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 }); }
+
+    async function copyBankAccount() {
+      try {
+        await navigator.clipboard.writeText(CONFIG.BANK_ACCOUNT_NO);
+        toast('คัดลอกเลขบัญชี ' + CONFIG.BANK_ACCOUNT_NO + ' แล้ว', 'success');
+      } catch (err) {
+        const input = document.createElement('textarea'); input.value = CONFIG.BANK_ACCOUNT_NO; document.body.appendChild(input); input.select();
+        document.execCommand('copy'); input.remove(); toast('คัดลอกเลขบัญชีแล้ว', 'success');
+      }
+    }
+
+    function applyPaymentUrlParams() {
+      if (paymentParamsApplied) return;
+      const params = new URLSearchParams(location.search);
+      const billId = params.get('billId') || '';
+      const memberId = params.get('memberId') || '';
+      if (!billId || !memberId) return;
+      const member = state.members.find(m => String(m.id) === String(memberId));
+      const bill = state.bills.find(b => String(b.id) === String(billId));
+      if (!member || !bill) { toast('ไม่พบบิลหรือสมาชิกจากลิงก์ LINE', 'error'); paymentParamsApplied = true; return; }
+      showTab('deposit');
+      document.getElementById('select-member').value = member.name;
+      renderBilling();
+      document.getElementById('select-bill').value = billId;
+      const row = state.billMembers.find(m => String(m.billId) === String(billId) && String(m.memberId) === String(memberId));
+      if (row) document.getElementById('ocr-amount').value = Math.max(0, Number(row.amount || 0) - Number(row.paidAmount || 0));
+      const context = document.getElementById('payment-link-context');
+      context.textContent = 'กำลังชำระ: ' + bill.title + ' • สมาชิก ' + member.name;
+      context.classList.remove('hidden');
+      paymentParamsApplied = true;
+      setTimeout(() => document.getElementById('dropzone').scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+    }
 
     function getLocalToday() {
       const now = new Date();
@@ -936,6 +984,7 @@
         renderActivitySelect();
         renderActivitiesSummaryCard();
         renderBilling();
+        applyPaymentUrlParams();
         syncAdminCycleControls();
       } catch (err) {
         toast(err.message, 'error');
@@ -1097,7 +1146,7 @@
     function getBillStats(billId) {
       const rows = state.billMembers.filter(m => String(m.billId) === String(billId));
       const paid = rows.filter(m => m.status === 'paid');
-      return { rows, paid, unpaid: rows.filter(m => m.status !== 'paid'), received: paid.reduce((s, m) => s + Number(m.amount || 0), 0), expected: rows.reduce((s, m) => s + Number(m.amount || 0), 0) };
+      return { rows, paid, unpaid: rows.filter(m => m.status !== 'paid'), received: rows.reduce((s, m) => s + Number(m.paidAmount || (m.status === 'paid' ? m.amount : 0)), 0), expected: rows.reduce((s, m) => s + Number(m.amount || 0), 0) };
     }
 
     function renderBilling() {
