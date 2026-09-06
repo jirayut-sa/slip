@@ -14,6 +14,7 @@
   <meta name="theme-color" content="#2563eb">
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -646,7 +647,8 @@
       ADMIN_PASSKEY: '6919050', // รหัสผ่านสำหรับเข้าหน้า Admin (แนะนำให้เปลี่ยน)
       BANK_NAME: 'ธนาคารกรุงไทย',
       BANK_ACCOUNT_NO: '9020878972',
-      BANK_ACCOUNT_NAME: 'นางสุวดี หีมปอง'
+      BANK_ACCOUNT_NAME: 'นางสุวดี หีมปอง',
+      LIFF_ID: '' // ระบบจะรับค่าจาก LIFF_ID ใน Apps Script โดยอัตโนมัติ
     };
 
     let state = { members: [], transactions: [], skippedMonths: [], activities: [], bills: [], billMembers: [], monthlyPlans: [], withdrawals: [], financeSummary: {} };
@@ -658,6 +660,8 @@
     let activeDepositCycle = null;
     const pendingDeletedTransactionIds = new Set();
     let paymentParamsApplied = false;
+    let liffInitPromise = null;
+    let currentLiffProfile = null;
 
     // ---------------- Utilities ----------------
     function toast(message, type = 'success') {
@@ -728,23 +732,51 @@
       }
     }
 
-    function applyPaymentUrlParams() {
+    async function initializeLiffForPayment() {
+      if (!CONFIG.LIFF_ID || !window.liff) return null;
+      if (!liffInitPromise) {
+        liffInitPromise = liff.init({ liffId: CONFIG.LIFF_ID, withLoginOnExternalBrowser: true })
+          .then(async () => {
+            if (!liff.isLoggedIn()) return null;
+            currentLiffProfile = await liff.getProfile();
+            return currentLiffProfile;
+          })
+          .catch(err => {
+            console.error('LIFF init error', err);
+            toast('เปิดข้อมูลสมาชิกจาก LINE ไม่สำเร็จ กำลังใช้ข้อมูลสำรอง', 'error');
+            return null;
+          });
+      }
+      return liffInitPromise;
+    }
+
+    async function applyPaymentUrlParams() {
       if (paymentParamsApplied) return;
+      const liffProfile = await initializeLiffForPayment();
       const params = new URLSearchParams(location.search);
       const billId = params.get('billId') || '';
       const memberId = params.get('memberId') || '';
-      if (!billId || !memberId) return;
-      const member = state.members.find(m => String(m.id) === String(memberId));
+      if (!billId) return;
+      const member = liffProfile && liffProfile.userId
+        ? state.members.find(m => String(m.lineUserId || '') === String(liffProfile.userId))
+        : state.members.find(m => String(m.id) === String(memberId));
       const bill = state.bills.find(b => String(b.id) === String(billId));
       if (!member || !bill) { toast('ไม่พบบิลหรือสมาชิกจากลิงก์ LINE', 'error'); paymentParamsApplied = true; return; }
+      const row = state.billMembers.find(m => String(m.billId) === String(billId) && String(m.memberId) === String(member.id) && m.status !== 'paid');
+      if (!row) { toast('บิลนี้ไม่ได้เรียกเก็บสมาชิกคนนี้ หรือชำระแล้ว', 'error'); paymentParamsApplied = true; return; }
       showTab('deposit');
       document.getElementById('select-member').value = member.name;
+      const scope = bill.billType === 'monthly' ? 'monthly' : 'activity';
+      const scopeRadio = document.querySelector('input[name="txn-scope"][value="' + scope + '"]');
+      if (scopeRadio) {
+        scopeRadio.checked = true;
+        scopeRadio.dispatchEvent(new Event('change', { bubbles: true }));
+      }
       renderBilling();
       document.getElementById('select-bill').value = billId;
-      const row = state.billMembers.find(m => String(m.billId) === String(billId) && String(m.memberId) === String(memberId));
-      if (row) document.getElementById('ocr-amount').value = Math.max(0, Number(row.amount || 0) - Number(row.paidAmount || 0));
+      document.getElementById('ocr-amount').value = Math.max(0, Number(row.amount || 0) - Number(row.paidAmount || 0));
       const context = document.getElementById('payment-link-context');
-      context.textContent = 'กำลังชำระ: ' + bill.title + ' • สมาชิก ' + member.name;
+      context.textContent = 'กำลังชำระ: ' + bill.title + ' • สมาชิก ' + member.name + ' • ' + (scope === 'monthly' ? 'เก็บเงินรายเดือน' : 'กิจกรรมเฉพาะกิจ');
       context.classList.remove('hidden');
       paymentParamsApplied = true;
       setTimeout(() => document.getElementById('dropzone').scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
@@ -977,6 +1009,15 @@
         state.monthlyPlans = data.monthlyPlans || [];
         state.withdrawals = data.withdrawals || [];
         state.financeSummary = data.financeSummary || {};
+        if (data.publicConfig) {
+          CONFIG.LIFF_ID = data.publicConfig.liffId || CONFIG.LIFF_ID;
+          CONFIG.BANK_NAME = data.publicConfig.bankName || CONFIG.BANK_NAME;
+          CONFIG.BANK_ACCOUNT_NO = data.publicConfig.bankAccountNo || CONFIG.BANK_ACCOUNT_NO;
+          CONFIG.BANK_ACCOUNT_NAME = data.publicConfig.bankAccountName || CONFIG.BANK_ACCOUNT_NAME;
+          document.getElementById('payment-bank-name').textContent = CONFIG.BANK_NAME;
+          document.getElementById('payment-account-name').textContent = CONFIG.BANK_ACCOUNT_NAME;
+          document.getElementById('payment-account-number').textContent = CONFIG.BANK_ACCOUNT_NO;
+        }
         renderDashboard();
         renderMemberSelect();
         renderMemberList();
@@ -984,7 +1025,7 @@
         renderActivitySelect();
         renderActivitiesSummaryCard();
         renderBilling();
-        applyPaymentUrlParams();
+        await applyPaymentUrlParams();
         syncAdminCycleControls();
       } catch (err) {
         toast(err.message, 'error');
