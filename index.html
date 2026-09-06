@@ -659,7 +659,7 @@
       BANK_NAME: 'ธนาคารกรุงไทย',
       BANK_ACCOUNT_NO: '9020878972',
       BANK_ACCOUNT_NAME: 'นางสุวดี หีมปอง',
-      LIFF_ID: '' // ระบบจะรับค่าจาก LIFF_ID ใน Apps Script โดยอัตโนมัติ
+      LIFF_ID: '2011470307-gvcrsOhk' // ระบบจะรับค่าจาก LIFF_ID ใน Apps Script และใช้ค่านี้เป็นค่าเริ่มต้น
     };
 
     let state = { members: [], transactions: [], skippedMonths: [], activities: [], bills: [], billMembers: [], monthlyPlans: [], withdrawals: [], financeSummary: {} };
@@ -745,7 +745,13 @@
       }
     }
 
+    function shouldInitializeLiff() {
+      const params = new URLSearchParams(location.search);
+      return params.has('view') || params.has('billId') || params.has('liff.state');
+    }
+
     async function initializeLiffForPayment() {
+      if (!shouldInitializeLiff()) return null;
       if (!CONFIG.LIFF_ID || !window.liff) return null;
       if (!liffInitPromise) {
         liffInitPromise = liff.init({ liffId: CONFIG.LIFF_ID, withLoginOnExternalBrowser: true })
