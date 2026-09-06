@@ -633,6 +633,17 @@
     </div>
   </div>
 
+  <!-- LIFF menu popup: เปิดเมนูโดยไม่ส่งข้อความในแชท -->
+  <div id="liff-menu-modal" class="hidden fixed inset-0 z-[90] bg-slate-950/45 backdrop-blur-sm items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="liff-menu-title">
+    <div class="bg-white w-full sm:max-w-2xl max-h-[94vh] rounded-t-[1.75rem] sm:rounded-[1.75rem] shadow-2xl overflow-hidden flex flex-col">
+      <div class="bg-gradient-to-r from-blue-700 to-teal-600 px-5 py-4 flex items-center justify-between gap-3 text-white">
+        <div class="min-w-0"><p class="text-[10px] uppercase tracking-[.16em] text-blue-100 font-bold">LIFF MENU</p><h2 id="liff-menu-title" class="font-extrabold text-xl truncate">เมนู</h2></div>
+        <button id="liff-menu-close" type="button" onclick="closeLiffMenu()" class="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 grid place-items-center shrink-0" aria-label="ปิด"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div id="liff-menu-body" class="p-5 sm:p-6 overflow-y-auto overscroll-contain"></div>
+    </div>
+  </div>
+
   <footer class="text-center py-6 text-xs text-gray-400 border-t border-gray-100 mt-8">
     <p>ระบบบันทึกการเก็บเงิน Section 1 • นักศึกษาหลักสูตรศึกษาศาสตรมหาบัณฑิต สาขาวิชาการบริหารการศึกษา มหาวิทยาลัยหาดใหญ่</p>
   </footer>
@@ -662,6 +673,8 @@
     let paymentParamsApplied = false;
     let liffInitPromise = null;
     let currentLiffProfile = null;
+    let currentLiffSession = null;
+    let liffMenuOpened = false;
 
     // ---------------- Utilities ----------------
     function toast(message, type = 'success') {
@@ -780,6 +793,162 @@
       context.classList.remove('hidden');
       paymentParamsApplied = true;
       setTimeout(() => document.getElementById('dropzone').scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+    }
+
+    async function getCurrentLiffSession() {
+      await initializeLiffForPayment();
+      if (currentLiffSession) return currentLiffSession;
+      if (!window.liff || !liff.isLoggedIn() || !liff.getAccessToken()) throw new Error('กรุณาเปิดเมนูนี้ภายในแอป LINE');
+      currentLiffSession = await apiCall('getLiffSession', { liffAccessToken: liff.getAccessToken() });
+      return currentLiffSession;
+    }
+
+    function closeLiffMenu() {
+      const modal = document.getElementById('liff-menu-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      document.body.style.overflow = '';
+      if (window.liff && liff.isInClient && liff.isInClient()) liff.closeWindow();
+    }
+
+    function liffEmptyState(text) {
+      return `<div class="text-center py-10"><div class="w-14 h-14 rounded-2xl bg-slate-100 grid place-items-center mx-auto mb-3"><i data-lucide="inbox" class="w-7 h-7 text-slate-400"></i></div><p class="text-sm font-bold text-slate-500">${escapeHtml(text)}</p></div>`;
+    }
+
+    function liffStatCard(label, value, colorClass) {
+      return `<div class="rounded-2xl border border-slate-100 bg-slate-50 p-4"><p class="text-xs font-bold text-slate-500">${escapeHtml(label)}</p><p class="text-xl font-extrabold mt-1 ${colorClass}">${fmtCurrency(value)}</p></div>`;
+    }
+
+    function renderLiffSummary() {
+      const s = state.financeSummary || {};
+      return `<div class="grid grid-cols-2 gap-3">
+        ${liffStatCard('รับทั้งหมด', s.income, 'text-emerald-600')}
+        ${liffStatCard('รายจ่ายทั้งหมด', s.expenses, 'text-rose-600')}
+        ${liffStatCard('ถอนนำไปใช้', s.withdrawn, 'text-orange-600')}
+        ${liffStatCard('ยอดค้างรับ', s.outstanding, 'text-amber-600')}
+        <div class="col-span-2 rounded-2xl bg-gradient-to-r from-blue-700 to-teal-600 p-5 text-white"><p class="text-xs text-blue-100 font-bold">ยอดเงินคงเหลือ</p><p class="text-3xl font-extrabold mt-1">${fmtCurrency(s.balance)}</p></div>
+      </div>`;
+    }
+
+    function renderLiffExpenses() {
+      const expenses = state.transactions.filter(t => Number(t.amount) < 0).map(t => ({ date: t.date, title: t.note || t.memberName || 'รายจ่าย', amount: Math.abs(Number(t.amount)), type: 'รายจ่าย' }));
+      const withdrawals = state.withdrawals.map(w => ({ date: w.date, title: w.purpose || 'ถอนเงิน', amount: Number(w.amount), type: 'ถอนเงิน' }));
+      const rows = expenses.concat(withdrawals).sort((a,b) => String(b.date).localeCompare(String(a.date))).slice(0, 100);
+      if (!rows.length) return liffEmptyState('ยังไม่มีรายจ่ายหรือรายการถอน');
+      return `<div class="space-y-3">${rows.map(row => `<div class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 p-4"><div class="min-w-0"><p class="font-bold text-slate-800 truncate">${escapeHtml(row.title)}</p><p class="text-xs text-slate-400 mt-1">${escapeHtml(String(row.date || '').substring(0,10))} • ${row.type}</p></div><p class="font-extrabold text-rose-600 shrink-0">-${fmtCurrency(row.amount)}</p></div>`).join('')}</div>`;
+    }
+
+    function renderLiffOpenBills() {
+      const bills = state.bills.filter(b => b.status === 'open');
+      if (!bills.length) return liffEmptyState('ไม่มีบิลที่กำลังเรียกเก็บ');
+      return `<div class="space-y-3">${bills.map(bill => {
+        const stats = getBillStats(bill.id);
+        return `<div class="rounded-2xl border border-slate-200 p-4"><div class="flex justify-between gap-3"><div class="min-w-0"><p class="font-extrabold text-slate-900">${escapeHtml(bill.title)}</p><p class="text-xs text-slate-500 mt-1">${bill.billType === 'monthly' ? 'รายเดือน' : 'กิจกรรม'} • ครบกำหนด ${escapeHtml(String(bill.dueDate || '').substring(0,10))}</p></div><p class="font-extrabold text-amber-600 shrink-0">${fmtCurrency(stats.expected-stats.received)}</p></div><p class="text-xs text-slate-500 mt-3">ชำระแล้ว ${stats.paid.length}/${stats.rows.length} คน</p><p class="text-xs text-rose-500 mt-1">ค้าง: ${stats.unpaid.map(m=>escapeHtml(m.memberName)).join(', ') || 'ไม่มี'}</p></div>`;
+      }).join('')}</div>`;
+    }
+
+    function renderLiffMyBills(session) {
+      if (!session.registered) return liffEmptyState('ยังไม่พบสมาชิกที่ผูกกับบัญชี LINE นี้');
+      const bills = {};
+      state.bills.filter(b => b.status === 'open').forEach(b => { bills[String(b.id)] = b; });
+      const rows = state.billMembers.filter(row => String(row.memberId) === String(session.memberId) && row.status !== 'paid' && bills[String(row.billId)]);
+      if (!rows.length) return liffEmptyState('ไม่มีบิลค้างชำระ');
+      return `<div class="space-y-3">${rows.map(row => {
+        const bill = bills[String(row.billId)];
+        const balance = Math.max(0, Number(row.amount || 0) - Number(row.paidAmount || 0));
+        return `<div class="rounded-2xl border border-slate-200 p-4"><p class="font-extrabold text-slate-900">${escapeHtml(bill.title)}</p><p class="text-xs text-slate-500 mt-1">${bill.billType === 'monthly' ? 'เก็บเงินรายเดือน' : 'กิจกรรมเฉพาะกิจ'} • ครบกำหนด ${escapeHtml(String(bill.dueDate || '').substring(0,10))}</p><p class="text-2xl font-extrabold text-amber-600 mt-3">${fmtCurrency(balance)}</p><button type="button" onclick="openLiffPayment('${String(bill.id).replace(/'/g, '')}')" class="mt-3 w-full rounded-xl bg-teal-600 text-white font-bold py-3">ส่งสลิปบิลนี้</button></div>`;
+      }).join('')}</div>`;
+    }
+
+    function renderLiffCreateBill(session) {
+      if (!session.isAdmin) return liffEmptyState('เมนูนี้สำหรับผู้ดูแลเท่านั้น');
+      const members = state.members.filter(m => String(m.status || 'active') !== 'inactive');
+      return `<form id="liff-create-bill-form" class="space-y-4">
+        <div class="grid grid-cols-2 gap-2"><label class="rounded-xl border border-teal-200 bg-teal-50 p-3 text-center font-bold text-teal-700 cursor-pointer"><input type="radio" name="liff-bill-type" value="monthly" checked class="mr-1"> รายเดือน</label><label class="rounded-xl border border-purple-200 bg-purple-50 p-3 text-center font-bold text-purple-700 cursor-pointer"><input type="radio" name="liff-bill-type" value="activity" class="mr-1"> กิจกรรม</label></div>
+        <input id="liff-bill-title" class="field-modern w-full px-4 py-3" placeholder="ชื่อรายการ/กิจกรรม" required>
+        <input id="liff-bill-amount" type="number" min="0.01" step="0.01" class="field-modern w-full px-4 py-3" placeholder="ยอดเงินต่อคน" required>
+        <div id="liff-monthly-due-wrap"><label class="text-xs font-bold text-slate-500">วันครบกำหนดรายเดือน (23–28)</label><input id="liff-bill-due-day" type="number" min="23" max="28" value="28" class="field-modern w-full px-4 py-3 mt-1" required></div>
+        <div id="liff-activity-due-wrap" class="hidden"><label class="text-xs font-bold text-slate-500">วันครบกำหนด</label><input id="liff-bill-due-date" type="date" class="field-modern w-full px-4 py-3 mt-1"></div>
+        <input id="liff-bill-note" class="field-modern w-full px-4 py-3" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)">
+        <div class="rounded-2xl border border-slate-200 p-4"><div class="flex items-center justify-between gap-2 mb-3"><p class="font-bold text-slate-800">เลือกสมาชิก</p><div class="flex gap-2"><button id="liff-select-all" type="button" class="text-xs font-bold text-blue-600">ทั้งหมด</button><button id="liff-clear-all" type="button" class="text-xs font-bold text-rose-600">ล้าง</button></div></div><div id="liff-member-checks" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto">${members.map(m => `<label class="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-sm font-semibold"><input type="checkbox" name="liff-member" value="${escapeHtml(m.id)}" checked> <span>${escapeHtml(m.name)}</span></label>`).join('')}</div></div>
+        <button id="liff-create-submit" class="w-full rounded-xl bg-gradient-to-r from-orange-500 to-rose-600 text-white font-extrabold py-3.5">ยืนยันสร้างบิล</button>
+      </form>`;
+    }
+
+    function bindLiffCreateBillForm() {
+      const form = document.getElementById('liff-create-bill-form');
+      if (!form) return;
+      const syncType = () => {
+        const monthly = document.querySelector('input[name="liff-bill-type"]:checked').value === 'monthly';
+        document.getElementById('liff-monthly-due-wrap').classList.toggle('hidden', !monthly);
+        document.getElementById('liff-activity-due-wrap').classList.toggle('hidden', monthly);
+        document.getElementById('liff-bill-due-day').required = monthly;
+        document.getElementById('liff-bill-due-date').required = !monthly;
+      };
+      document.querySelectorAll('input[name="liff-bill-type"]').forEach(el => el.addEventListener('change', syncType));
+      document.getElementById('liff-select-all').addEventListener('click', () => document.querySelectorAll('input[name="liff-member"]').forEach(el => { el.checked = true; }));
+      document.getElementById('liff-clear-all').addEventListener('click', () => document.querySelectorAll('input[name="liff-member"]').forEach(el => { el.checked = false; }));
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const memberIds = [...document.querySelectorAll('input[name="liff-member"]:checked')].map(el => el.value);
+        if (!memberIds.length) return toast('กรุณาเลือกสมาชิกอย่างน้อย 1 คน', 'error');
+        const billType = document.querySelector('input[name="liff-bill-type"]:checked').value;
+        const button = document.getElementById('liff-create-submit');
+        button.disabled = true; button.textContent = 'กำลังสร้างบิล...';
+        try {
+          await apiCall('createLiffBill', {
+            liffAccessToken: liff.getAccessToken(), billType,
+            title: document.getElementById('liff-bill-title').value.trim(),
+            amountPerMember: Number(document.getElementById('liff-bill-amount').value),
+            dueDay: Number(document.getElementById('liff-bill-due-day').value),
+            dueDate: document.getElementById('liff-bill-due-date').value,
+            note: document.getElementById('liff-bill-note').value.trim(), memberIds
+          });
+          toast('สร้างบิลเรียบร้อยแล้ว', 'success');
+          await loadData();
+          setTimeout(closeLiffMenu, 700);
+        } catch (err) { toast(err.message, 'error'); button.disabled = false; button.textContent = 'ยืนยันสร้างบิล'; }
+      });
+      syncType();
+    }
+
+    async function openLiffMenu(view) {
+      const allowed = ['create-bill', 'my-bills', 'open-bills', 'summary', 'expenses'];
+      if (allowed.indexOf(view) === -1) return;
+      const session = await getCurrentLiffSession();
+      const titles = { 'create-bill': 'สร้างบิล', 'my-bills': 'บิลของฉัน', 'open-bills': 'บิลที่กำลังเรียกเก็บ', summary: 'สรุปยอดเงิน', expenses: 'รายจ่ายทั้งหมด' };
+      const body = document.getElementById('liff-menu-body');
+      document.getElementById('liff-menu-title').textContent = titles[view];
+      if (view === 'create-bill') body.innerHTML = renderLiffCreateBill(session);
+      if (view === 'my-bills') body.innerHTML = renderLiffMyBills(session);
+      if (view === 'open-bills') body.innerHTML = renderLiffOpenBills();
+      if (view === 'summary') body.innerHTML = renderLiffSummary();
+      if (view === 'expenses') body.innerHTML = renderLiffExpenses();
+      const modal = document.getElementById('liff-menu-modal');
+      modal.classList.remove('hidden'); modal.classList.add('flex'); document.body.style.overflow = 'hidden';
+      liffMenuOpened = true;
+      bindLiffCreateBillForm();
+      lucide.createIcons();
+    }
+
+    async function openLiffMenuFromUrl() {
+      if (liffMenuOpened) return;
+      await initializeLiffForPayment();
+      const view = new URLSearchParams(location.search).get('view') || '';
+      if (!view) return;
+      try { await openLiffMenu(view); } catch (err) { toast(err.message, 'error'); }
+    }
+
+    async function openLiffPayment(billId) {
+      const url = new URL(location.href);
+      url.searchParams.delete('view');
+      url.searchParams.set('billId', billId);
+      if (currentLiffSession && currentLiffSession.memberId) url.searchParams.set('memberId', currentLiffSession.memberId);
+      history.replaceState({}, '', url.toString());
+      const modal = document.getElementById('liff-menu-modal');
+      modal.classList.add('hidden'); modal.classList.remove('flex'); document.body.style.overflow = '';
+      paymentParamsApplied = false;
+      await applyPaymentUrlParams();
     }
 
     function getLocalToday() {
@@ -1026,6 +1195,7 @@
         renderActivitiesSummaryCard();
         renderBilling();
         await applyPaymentUrlParams();
+        await openLiffMenuFromUrl();
         syncAdminCycleControls();
       } catch (err) {
         toast(err.message, 'error');
