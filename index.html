@@ -256,6 +256,15 @@
         </div>
       </div>
 
+      <div class="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+        <div class="stat-card rounded-2xl p-4 sm:p-5"><p class="text-xs text-slate-500">ยอดค้างรับตามบิล</p><p id="val-outstanding" class="text-xl sm:text-2xl font-extrabold text-amber-600 mt-1.5">฿0</p></div>
+        <div class="stat-card rounded-2xl p-4 sm:p-5"><p class="text-xs text-slate-500">ยอดถอนนำไปใช้</p><p id="val-withdrawn" class="text-xl sm:text-2xl font-extrabold text-red-600 mt-1.5">฿0</p></div>
+      </div>
+      <div class="surface-card rounded-[1.5rem] p-4 sm:p-6 mb-6">
+        <div class="flex items-center justify-between mb-4"><div><p class="text-[11px] font-bold uppercase tracking-[.14em] text-amber-600">Bills</p><h3 class="font-extrabold text-lg text-slate-900">บิลที่กำลังเรียกเก็บ</h3></div><span id="open-bill-count" class="soft-chip bg-amber-50 text-amber-700">0 บิล</span></div>
+        <div id="open-bills-list" class="space-y-3"></div>
+      </div>
+
       <div class="surface-card rounded-[1.5rem] p-4 sm:p-6 w-full">
         <div class="flex items-center justify-between gap-3 mb-4 sm:mb-5">
           <div>
@@ -309,6 +318,12 @@
             <select id="select-activity" class="field-modern w-full px-4 py-3 text-sm">
               <option value="">-- เลือกกิจกรรม --</option>
             </select>
+          </div>
+
+          <div id="bill-select-wrap" class="mt-4">
+            <label class="block text-sm font-semibold mb-2 text-gray-800" for="select-bill"><i data-lucide="receipt-text" class="w-4 h-4 inline -mt-1"></i> บิลที่ชำระ (ถ้ามี)</label>
+            <select id="select-bill" class="field-modern w-full px-4 py-3 text-sm"><option value="">-- ฝากเงินทั่วไป ไม่ผูกบิล --</option></select>
+            <p class="text-[11px] text-slate-400 mt-1">การเลือกบิลจะเปลี่ยนสถานะสมาชิกเป็น “จ่ายแล้ว” อัตโนมัติเมื่อบันทึกสลิป</p>
           </div>
 
           <div id="txn-type-wrap" class="mt-4">
@@ -438,6 +453,40 @@
           <button onclick="logoutAdmin()" type="button" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-red-100 text-red-600 hover:bg-red-50 text-sm font-bold shadow-sm">
             <i data-lucide="log-out" class="w-4 h-4"></i>ออกจากระบบ
           </button>
+        </div>
+
+        <div class="grid xl:grid-cols-2 gap-5">
+          <div class="surface-card rounded-[1.5rem] p-5 sm:p-6">
+            <div class="flex items-center gap-3 mb-5"><div class="metric-icon w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 grid place-items-center"><i data-lucide="receipt-text" class="w-5 h-5 text-white"></i></div><div><h3 class="font-extrabold text-lg text-slate-900">สร้างบิลกิจกรรม</h3><p class="text-xs text-slate-500">เรียกเก็บสมาชิกทุกคนและประกาศใน LINE</p></div></div>
+            <form id="bill-form" class="space-y-3">
+              <input id="bill-title" class="field-modern w-full px-4 py-3 text-sm" placeholder="ชื่อกิจกรรม/ชื่อบิล" required>
+              <div class="grid grid-cols-2 gap-3"><input id="bill-amount" type="number" min="0.01" step="0.01" class="field-modern px-4 py-3 text-sm" placeholder="ยอดต่อคน" required><input id="bill-due" type="date" class="field-modern px-4 py-3 text-sm" required></div>
+              <input id="bill-note" class="field-modern w-full px-4 py-3 text-sm" placeholder="รายละเอียดเพิ่มเติม">
+              <button class="btn-primary w-full py-3 rounded-xl text-sm font-bold text-white">สร้างบิลและแจ้ง LINE</button>
+            </form>
+          </div>
+          <div class="surface-card rounded-[1.5rem] p-5 sm:p-6">
+            <div class="flex items-center gap-3 mb-5"><div class="metric-icon w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 grid place-items-center"><i data-lucide="calendar-sync" class="w-5 h-5 text-white"></i></div><div><h3 class="font-extrabold text-lg text-slate-900">ตั้งเก็บเงินรายเดือน</h3><p class="text-xs text-slate-500">สร้างบิลใหม่ให้อัตโนมัติทุกเดือน</p></div></div>
+            <form id="monthly-plan-form" class="space-y-3">
+              <input id="plan-title" class="field-modern w-full px-4 py-3 text-sm" placeholder="ชื่อรายการ เช่น เงินกองกลาง" required>
+              <div class="grid grid-cols-3 gap-2"><input id="plan-amount" type="number" min="0.01" step="0.01" class="field-modern px-3 py-3 text-sm" placeholder="บาท/คน" required><input id="plan-billing-day" type="number" min="1" max="28" value="1" class="field-modern px-3 py-3 text-sm" title="วันที่สร้างบิล"><input id="plan-due-day" type="number" min="1" max="28" value="25" class="field-modern px-3 py-3 text-sm" title="วันครบกำหนด"></div>
+              <button class="btn-primary w-full py-3 rounded-xl text-sm font-bold text-white">เปิดแผนรายเดือน</button>
+            </form>
+            <div id="monthly-plan-list" class="space-y-2 mt-4"></div>
+          </div>
+        </div>
+
+        <div class="surface-card rounded-[1.5rem] p-5 sm:p-6">
+          <div class="flex items-center gap-3 mb-5"><div class="metric-icon w-11 h-11 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 grid place-items-center"><i data-lucide="banknote-arrow-down" class="w-5 h-5 text-white"></i></div><div><h3 class="font-extrabold text-lg text-slate-900">บันทึกถอนเงินไปใช้</h3><p class="text-xs text-slate-500">ยอดถอนจะถูกหักออกจากยอดคงเหลือ</p></div></div>
+          <form id="withdrawal-form" class="grid sm:grid-cols-[150px_1fr_180px_auto] gap-2.5">
+            <input id="withdrawal-amount" type="number" min="0.01" step="0.01" class="field-modern px-4 py-3 text-sm" placeholder="จำนวนเงิน" required><input id="withdrawal-purpose" class="field-modern px-4 py-3 text-sm" placeholder="นำไปใช้เรื่องอะไร" required><input id="withdrawal-by" class="field-modern px-4 py-3 text-sm" placeholder="ผู้ถอน" required><button class="bg-red-600 text-white rounded-xl px-5 py-3 text-sm font-bold">บันทึกถอน</button>
+          </form>
+          <div id="withdrawal-list" class="space-y-2 mt-4"></div>
+        </div>
+
+        <div class="surface-card rounded-[1.5rem] p-5 sm:p-6">
+          <div class="flex items-center justify-between mb-4"><div><h3 class="font-extrabold text-lg text-slate-900">จัดการบิลและติดตามการชำระ</h3><p class="text-xs text-slate-500">ส่งเตือนซ้ำหรือปิดบิลได้</p></div></div>
+          <div id="admin-bill-list" class="space-y-3"></div>
         </div>
 
         <div class="surface-card rounded-[1.5rem] p-5 sm:p-6">
@@ -585,7 +634,7 @@
       ADMIN_PASSKEY: '6919050' // รหัสผ่านสำหรับเข้าหน้า Admin (แนะนำให้เปลี่ยน)
     };
 
-    let state = { members: [], transactions: [], skippedMonths: [], activities: [] };
+    let state = { members: [], transactions: [], skippedMonths: [], activities: [], bills: [], billMembers: [], monthlyPlans: [], withdrawals: [], financeSummary: {} };
     let adminUnlocked = false;
     let currentSlip = null;
     let currentOcrExtra = {};
@@ -875,12 +924,18 @@
         });
         state.skippedMonths = data.skippedMonths || [];
         state.activities = data.activities || [];
+        state.bills = data.bills || [];
+        state.billMembers = data.billMembers || [];
+        state.monthlyPlans = data.monthlyPlans || [];
+        state.withdrawals = data.withdrawals || [];
+        state.financeSummary = data.financeSummary || {};
         renderDashboard();
         renderMemberSelect();
         renderMemberList();
         renderAdminTxnList();
         renderActivitySelect();
         renderActivitiesSummaryCard();
+        renderBilling();
         syncAdminCycleControls();
       } catch (err) {
         toast(err.message, 'error');
@@ -1038,6 +1093,52 @@
       lucide.createIcons();
     }
 
+    // ---------------- Smart bills / withdrawals ----------------
+    function getBillStats(billId) {
+      const rows = state.billMembers.filter(m => String(m.billId) === String(billId));
+      const paid = rows.filter(m => m.status === 'paid');
+      return { rows, paid, unpaid: rows.filter(m => m.status !== 'paid'), received: paid.reduce((s, m) => s + Number(m.amount || 0), 0), expected: rows.reduce((s, m) => s + Number(m.amount || 0), 0) };
+    }
+
+    function renderBilling() {
+      const openBills = state.bills.filter(b => b.status === 'open');
+      const openList = document.getElementById('open-bills-list');
+      document.getElementById('open-bill-count').textContent = openBills.length + ' บิล';
+      openList.innerHTML = openBills.length ? openBills.map(b => {
+        const s = getBillStats(b.id);
+        return `<div class="rounded-2xl border border-slate-200 p-4"><div class="flex justify-between gap-3"><div><p class="font-extrabold text-slate-900">${escapeHtml(b.title)}</p><p class="text-xs text-slate-500 mt-1">ครบกำหนด ${String(b.dueDate || '').substring(0,10)} • จ่ายแล้ว ${s.paid.length}/${s.rows.length} คน</p></div><span class="font-extrabold text-amber-600">${fmtCurrency(s.expected-s.received)}</span></div><div class="h-2 bg-slate-100 rounded-full mt-3 overflow-hidden"><div class="h-full bg-gradient-to-r from-blue-500 to-teal-500" style="width:${s.rows.length ? Math.round(s.paid.length/s.rows.length*100) : 0}%"></div></div><p class="text-[11px] text-red-500 mt-2 truncate">ค้าง: ${s.unpaid.map(m=>escapeHtml(m.memberName)).join(', ') || 'ไม่มี'}</p></div>`;
+      }).join('') : '<p class="text-sm text-slate-400 text-center py-5">ไม่มีบิลที่เปิดอยู่</p>';
+
+      const billAdmin = document.getElementById('admin-bill-list');
+      if (billAdmin) billAdmin.innerHTML = state.bills.length ? [...state.bills].reverse().map(b => {
+        const s = getBillStats(b.id);
+        return `<div class="rounded-2xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><p class="font-bold text-slate-900">${escapeHtml(b.title)} <span class="text-xs ${b.status==='open'?'text-amber-600':'text-emerald-600'}">${b.status}</span></p><p class="text-xs text-slate-500 mt-1">รับแล้ว ${fmtCurrency(s.received)} / ${fmtCurrency(s.expected)} • ค้าง ${s.unpaid.length} คน</p></div><div class="flex gap-2">${b.status==='open'?`<button onclick="remindBill('${b.id}')" class="px-3 py-2 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold">แจ้งเตือน LINE</button><button onclick="closeBill('${b.id}')" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">ปิดบิล</button>`:''}</div></div>`;
+      }).join('') : '<p class="text-sm text-slate-400 text-center py-5">ยังไม่มีบิล</p>';
+
+      const memberName = document.getElementById('select-member').value;
+      const billSelect = document.getElementById('select-bill');
+      const old = billSelect.value;
+      const eligible = openBills.filter(b => state.billMembers.some(m => String(m.billId)===String(b.id) && m.memberName===memberName && m.status!=='paid'));
+      billSelect.innerHTML = '<option value="">-- ฝากเงินทั่วไป ไม่ผูกบิล --</option>' + eligible.map(b => `<option value="${b.id}">${escapeHtml(b.title)} (${fmtCurrency(getBillStats(b.id).rows.find(m=>m.memberName===memberName)?.amount || 0)})</option>`).join('');
+      if (eligible.some(b=>String(b.id)===String(old))) billSelect.value=old;
+
+      const plans = document.getElementById('monthly-plan-list');
+      if (plans) plans.innerHTML = state.monthlyPlans.filter(p=>p.status==='active').map(p=>`<div class="flex items-center justify-between rounded-xl bg-blue-50 p-3"><div><p class="text-sm font-bold text-blue-900">${escapeHtml(p.title)}</p><p class="text-xs text-blue-600">${fmtCurrency(p.amountPerMember)}/คน • วันที่ ${p.billingDay}–${p.dueDay}</p></div><button onclick="deleteMonthlyPlan('${p.id}')" class="text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>`).join('') || '<p class="text-xs text-slate-400">ยังไม่มีแผนรายเดือน</p>';
+
+      const wd = document.getElementById('withdrawal-list');
+      if (wd) wd.innerHTML = [...state.withdrawals].reverse().slice(0,10).map(w=>`<div class="flex items-center justify-between rounded-xl bg-red-50 p-3"><div><p class="text-sm font-bold text-red-900">${escapeHtml(w.purpose)}</p><p class="text-xs text-red-600">${escapeHtml(w.withdrawnBy)} • ${String(w.date).substring(0,10)}</p></div><div class="flex items-center gap-3"><b class="text-red-700">-${fmtCurrency(w.amount)}</b><button onclick="deleteWithdrawal('${w.id}')" class="text-red-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></div>`).join('') || '<p class="text-xs text-slate-400">ยังไม่มีรายการถอน</p>';
+      lucide.createIcons();
+    }
+
+    async function remindBill(id){ try{await apiCall('sendBillReminder',{id});toast('ส่งแจ้งเตือนแล้ว');await loadData();}catch(e){toast(e.message,'error');} }
+    async function closeBill(id){ if(!confirm('ปิดบิลนี้หรือไม่?'))return;try{await apiCall('closeBill',{id});toast('ปิดบิลแล้ว');await loadData();}catch(e){toast(e.message,'error');} }
+    async function deleteMonthlyPlan(id){if(!confirm('หยุดแผนรายเดือนนี้หรือไม่?'))return;try{await apiCall('deleteMonthlyPlan',{id});toast('หยุดแผนแล้ว');await loadData();}catch(e){toast(e.message,'error');}}
+    async function deleteWithdrawal(id){if(!confirm('ลบรายการถอนนี้หรือไม่?'))return;try{await apiCall('deleteWithdrawal',{id});toast('ลบรายการถอนแล้ว');await loadData();}catch(e){toast(e.message,'error');}}
+
+    document.getElementById('bill-form').addEventListener('submit',async e=>{e.preventDefault();try{await apiCall('createBill',{title:document.getElementById('bill-title').value,amountPerMember:Number(document.getElementById('bill-amount').value),dueDate:document.getElementById('bill-due').value,billType:'activity',note:document.getElementById('bill-note').value});e.target.reset();toast('สร้างบิลและแจ้ง LINE แล้ว');await loadData();}catch(err){toast(err.message,'error');}});
+    document.getElementById('monthly-plan-form').addEventListener('submit',async e=>{e.preventDefault();try{await apiCall('createMonthlyPlan',{title:document.getElementById('plan-title').value,amountPerMember:Number(document.getElementById('plan-amount').value),billingDay:Number(document.getElementById('plan-billing-day').value),dueDay:Number(document.getElementById('plan-due-day').value)});e.target.reset();toast('เปิดแผนเก็บเงินรายเดือนแล้ว');await loadData();}catch(err){toast(err.message,'error');}});
+    document.getElementById('withdrawal-form').addEventListener('submit',async e=>{e.preventDefault();try{await apiCall('addWithdrawal',{amount:Number(document.getElementById('withdrawal-amount').value),purpose:document.getElementById('withdrawal-purpose').value,withdrawnBy:document.getElementById('withdrawal-by').value});e.target.reset();toast('บันทึกยอดถอนแล้ว');await loadData();}catch(err){toast(err.message,'error');}});
+
     // ---------------- Dashboard ----------------
     function renderDashboard() {
       const txns = state.transactions;
@@ -1050,8 +1151,12 @@
         if (amt > 0) { totalDeposit += amt; }
         else { totalExpense += Math.abs(amt); if (month === thisMonth) monthExpense += Math.abs(amt); }
       });
-      countUp(document.getElementById('val-balance'), totalDeposit - totalExpense);
+      const withdrawn = state.withdrawals.reduce((s,w)=>s+(Number(w.amount)||0),0);
+      countUp(document.getElementById('val-balance'), totalDeposit - totalExpense - withdrawn);
       countUp(document.getElementById('val-expense'), totalExpense);
+      countUp(document.getElementById('val-withdrawn'), withdrawn);
+      countUp(document.getElementById('val-outstanding'), Number(state.financeSummary.outstanding)||0);
+      renderBilling();
 
       // ใช้รอบเก็บเงินจริง: หากยังไม่ครบเป้า ให้คงรอบเดิมแม้เดือนปฏิทินจะเปลี่ยน
       activeDepositCycle = getActiveDepositCycle();
@@ -1203,6 +1308,12 @@
 
     document.getElementById('select-member').addEventListener('change', () => {
       if (!document.getElementById('ocr-result').classList.contains('hidden')) checkNameMatch();
+      renderBilling();
+    });
+    document.getElementById('select-bill').addEventListener('change', event => {
+      const memberName = document.getElementById('select-member').value;
+      const row = state.billMembers.find(m => String(m.billId) === String(event.target.value) && m.memberName === memberName);
+      if (row) document.getElementById('ocr-amount').value = Number(row.amount) || '';
     });
     document.getElementById('ocr-sender').addEventListener('input', () => {
       if (!document.getElementById('ocr-result').classList.contains('hidden')) checkNameMatch();
@@ -1461,6 +1572,7 @@
       const member = document.getElementById('select-member').value;
       const scope = document.querySelector('input[name="txn-scope"]:checked').value;
       const activityId = scope === 'activity' ? document.getElementById('select-activity').value : '';
+      const billId = document.getElementById('select-bill').value;
       const type = scope === 'activity' ? 'deposit' : document.querySelector('input[name="txn-type"]:checked').value;
       const amount = Number(document.getElementById('ocr-amount').value);
       const date = currentUploadDate || getLocalToday();
@@ -1493,6 +1605,7 @@
           ocrReferenceNo: currentOcrExtra.referenceNo || '',
           nameMatchStatus,
           activityId,
+          billId,
           imageBase64: currentSlip.base64, mimeType: currentSlip.mimeType
         });
         showDepositMsg('บันทึกรายการสำเร็จ!', false);
