@@ -1,0 +1,15 @@
+{
+  "name": "sec1-chicken-club",
+  "private": true,
+  "version": "3.0.0",
+  "description": "LINE / Apps Script payment bot with a separate chicken collection game",
+  "scripts": {
+    "test": "node tests/backend.test.cjs",
+    "test:ui": "node tests/browser.test.cjs",
+    "build:assets": "node build-assets.cjs && python3 finish-assets.py"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1",
+    "sharp": "0.35.4"
+  }
+}
